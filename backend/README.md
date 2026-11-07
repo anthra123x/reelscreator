@@ -80,7 +80,7 @@ El backend expone las siguientes interfaces de aplicacion agrupadas por prefijo:
 - Creacion de migraciones PostgreSQL con claves foraneas en cascada, UUIDs e indices compuestos.
 - Desarrollo completo de los 4 modulos (`Videos`, `Clips`, `SocialAccounts`, `Publishing`).
 - Implementacion de `RustProcessorClient` con manejo de excepciones y timeouts.
-- Habilitacion de despliegue serverless para produccion en Vercel con el runtime `vercel-php@0.9.0`, conexion directa al endpoint de Neon PostgreSQL sin parametros de startup conflictivos, resolucion de prefijo de rutas en `api/index.php` y persistencia relacional activa.
+- Habilitacion de despliegue serverless para produccion en Vercel con el runtime `vercel-php@0.9.0`, conexion directa a Neon PostgreSQL con soporte de `DB_OPTIONS` para ruteo de endpoint en entornos serverless sin SNI nativo, resolucion de prefijo de rutas en `api/index.php` y persistencia relacional activa.
 
 ## 8. Cómo verificar
 Ejecutar la suite completa de pruebas:

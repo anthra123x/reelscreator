@@ -87,7 +87,7 @@ return [
         'pgsql' => [
             'driver' => 'pgsql',
             'url' => env('DB_URL'),
-            'host' => env('DB_HOST', '127.0.0.1'),
+            'host' => env('DB_HOST', '127.0.0.1') . (env('DB_OPTIONS') ? ';options=\'' . env('DB_OPTIONS') . '\'' : ''),
             'port' => env('DB_PORT', '5432'),
             'database' => env('DB_DATABASE', 'reelforge'),
             'username' => env('DB_USERNAME', 'postgres'),
