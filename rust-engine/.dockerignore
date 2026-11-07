@@ -1,0 +1,8 @@
+# Production exclusions per User Global Rule 4
+**/*README*.md
+**/*README.agent.md
+
+# Build output and temporary files
+target/
+.git/
+Cargo.lock

@@ -1,0 +1,16 @@
+[package]
+name = "reelforge-downloader"
+version = "0.1.0"
+edition = "2021"
+description = "yt-dlp child process wrapper, progress parser, and fixture loader for ReelForge"
+
+[dependencies]
+reelforge-core = { path = "../reelforge-core" }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+regex = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+tempfile = { workspace = true }

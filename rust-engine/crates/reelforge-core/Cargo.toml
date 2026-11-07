@@ -1,0 +1,12 @@
+[package]
+name = "reelforge-core"
+version = "0.1.0"
+edition = "2021"
+description = "Core domain types, models, errors, and state machine for ReelForge"
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }

@@ -1,0 +1,59 @@
+# Environment & secrets
+.env
+.env.backup
+.env.production
+*.local
+
+# Rust
+rust-engine/target/
+rust-engine/**/target/
+**/*.rs.bk
+Cargo.lock
+
+# Node / Angular
+node_modules/
+dist/
+.angular/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# PHP / Laravel
+backend/vendor/
+backend/bootstrap/cache/
+backend/storage/*.key
+backend/storage/app/*
+!backend/storage/app/.gitignore
+backend/storage/framework/cache/*
+!backend/storage/framework/cache/.gitignore
+backend/storage/framework/sessions/*
+!backend/storage/framework/sessions/.gitignore
+backend/storage/framework/views/*
+!backend/storage/framework/views/.gitignore
+backend/storage/logs/*
+!backend/storage/logs/.gitignore
+
+# Media processing storage
+storage/media/raw/*
+!storage/media/raw/.gitkeep
+storage/media/clips/*
+!storage/media/clips/.gitkeep
+storage/media/thumbnails/*
+!storage/media/thumbnails/.gitkeep
+storage/media/demo/*
+!storage/media/demo/.gitkeep
+
+
+# IDEs & OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Agent workspaces & session artifacts
+.agents/
+rust_out
+
+

@@ -1,0 +1,18 @@
+[package]
+name = "reelforge-cli"
+version = "0.1.0"
+edition = "2021"
+description = "Standalone command line interface for ReelForge"
+
+[dependencies]
+reelforge-core = { path = "../reelforge-core" }
+reelforge-downloader = { path = "../reelforge-downloader" }
+reelforge-cutter = { path = "../reelforge-cutter" }
+clap = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+tempfile = { workspace = true }

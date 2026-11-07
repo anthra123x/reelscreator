@@ -1,0 +1,7 @@
+# Production exclusions per User Global Rule 4
+**/*README*.md
+**/*README.agent.md
+
+src/
+node_modules/
+.angular/

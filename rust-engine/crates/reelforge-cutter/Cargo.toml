@@ -1,0 +1,17 @@
+[package]
+name = "reelforge-cutter"
+version = "0.1.0"
+edition = "2021"
+description = "FFmpeg 9:16 vertical video transformation and thumbnail extraction for ReelForge"
+
+[dependencies]
+reelforge-core = { path = "../reelforge-core" }
+reelforge-downloader = { path = "../reelforge-downloader" }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+tempfile = { workspace = true }

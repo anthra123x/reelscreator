@@ -1,0 +1,38 @@
+# Production exclusions per User Global Rule 4
+**/*README*.md
+**/*README.agent.md
+
+# Agent metadata and task traces
+.agents/
+
+# Version control and environment
+.git/
+.gitignore
+.env
+.env.*
+!.env.example
+
+# Test suites and reports
+tests/
+**/tests/
+coverage/
+
+# Build caches and temporary artifacts
+rust-engine/target/
+backend/vendor/
+backend/bootstrap/cache/*
+backend/storage/framework/cache/*
+backend/storage/framework/sessions/*
+backend/storage/framework/views/*
+backend/storage/logs/*
+frontend/node_modules/
+frontend/.angular/
+frontend/dist/
+
+# Media processing storage runtime files
+storage/media/raw/*
+!storage/media/raw/.gitkeep
+storage/media/clips/*
+!storage/media/clips/.gitkeep
+storage/media/thumbnails/*
+!storage/media/thumbnails/.gitkeep

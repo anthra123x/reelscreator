@@ -1,0 +1,9 @@
+# Production exclusions per User Global Rule 4
+**/*README*.md
+**/*README.agent.md
+
+# Build output and node modules
+dist/
+node_modules/
+.angular/
+.git/

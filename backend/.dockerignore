@@ -1,0 +1,21 @@
+# Production exclusions per User Global Rule 4
+**/*README*.md
+**/*README.agent.md
+
+# Environment and secrets
+.git/
+.env
+.env.*
+!.env.example
+
+# Testing and development
+tests/
+phpunit.xml
+
+# Temporary and build artifacts
+vendor/
+bootstrap/cache/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/logs/*
