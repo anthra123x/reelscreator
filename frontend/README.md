@@ -64,7 +64,7 @@ El frontend consume la API REST provista por el backend modular Laravel en `/api
 - Incorporación y validación de suites de pruebas adversariales para componentes, tuberías, interceptores y flujos reactivos.
 - Configuración de `proxyConfig: "proxy.conf.json"` en `angular.json` para resolución transparente de endpoints `/api` y `/storage` en desarrollo local.
 - Remediación técnica integral de observaciones de revisión: refactorización a señales en `VerticalPlayerComponent`, validación estricta de fecha futura en `PublishComponent`, control de límites y feedback visual en `ClipsComponent`, y formateo de fechas futuras en `RelativeTimePipe`.
-- Corrección de branding e identidad visual: generación de favicon monocromático `favicon.svg` y `favicon.ico`, ajuste de título en `index.html` a ReelForge, dimensionamiento estricto global de iconos SVG en `styles.css` y saneamiento de estilos en componentes de cuentas sociales y subida de videos a la paleta estricta blanco, gris y negro.
+- Corrección de branding e identidad visual: generación de favicon monocromático multirresolución `favicon.svg` y `favicon.ico` (16, 32, 48px) con invalidación de caché `?v=3`, ajuste de título en `index.html` a ReelForge, dimensionamiento estricto global de iconos SVG en `styles.css` y saneamiento de estilos en componentes de cuentas sociales y subida de videos a la paleta estricta blanco, gris y negro.
 - Configuración de despliegue en producción en Vercel con integración a GitHub (`https://github.com/anthra123x/reelscreator.git`): ajuste de `rootDirectory: "frontend"`, framework `angular`, configuración de rewrite para SPA en `vercel.json` y despliegue productivo verificado en `https://reelscreator-beta.vercel.app`.
 
 ## 8. Cómo verificar

@@ -97,9 +97,6 @@ return [
             'prefix_indexes' => true,
             'search_path' => env('DB_SEARCH_PATH', 'public'),
             'sslmode' => env('DB_SSLMODE', 'require'),
-            'server_options' => array_filter([
-                'endpoint' => env('DB_ENDPOINT_ID', 'ep-rapid-smoke-ar8m1707-pooler'),
-            ]),
             'options' => [
                 (defined('Pdo\Pgsql::ATTR_DISABLE_PREPARES') ? \Pdo\Pgsql::ATTR_DISABLE_PREPARES : \PDO::PGSQL_ATTR_DISABLE_PREPARES) => true,
             ],
