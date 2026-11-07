@@ -21,4 +21,8 @@ foreach ($requiredDirs as $dir) {
     }
 }
 
+// Prevent Symfony/Laravel from stripping /api as the script base URL
+$_SERVER['SCRIPT_NAME'] = '/index.php';
+$_SERVER['PHP_SELF'] = '/index.php';
+
 require __DIR__ . '/../public/index.php';
