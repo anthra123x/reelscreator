@@ -25,6 +25,7 @@
     "DB_USERNAME": "reelforge_owner",
     "DB_PASSWORD": "npg_2zZeJixFnqg8",
     "DB_SSLMODE": "require",
+    "DB_ENDPOINT_ID": "ep-rapid-smoke-ar8m1707-pooler",
     "DB_URL": "postgresql://reelforge_owner:npg_2zZeJixFnqg8@ep-rapid-smoke-ar8m1707-pooler.c-4.us-west-2.aws.neon.tech/reelforge?sslmode=require",
     "SESSION_DRIVER": "cookie",
     "CACHE_STORE": "array",
