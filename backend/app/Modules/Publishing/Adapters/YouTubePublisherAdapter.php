@@ -35,7 +35,7 @@ class YouTubePublisherAdapter extends AbstractPublisherAdapter
             );
         }
 
-        if (config('social.mock_mode') || $account->is_mock || empty(config('social.youtube.client_id'))) {
+        if (config('social.mock_mode') || $account->is_mock || empty($account->access_token)) {
             $mock = new MockSocialAdapter(SocialAccount::PLATFORM_YOUTUBE);
 
             return $mock->publish($clip, $account, $options);

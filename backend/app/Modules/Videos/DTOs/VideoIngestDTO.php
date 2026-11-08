@@ -13,6 +13,9 @@ class VideoIngestDTO
         public readonly int $maxDurationSeconds = 60,
         public readonly string $verticalMode = 'blur_padding',
         public readonly ?string $title = null,
+        public readonly bool $autoPublish = true,
+        public readonly array $platforms = ['tiktok', 'instagram', 'youtube'],
+        public readonly ?string $caption = null,
         public readonly array $extraParams = []
     ) {
         $allowedStrategies = ['fixed_interval', 'scene_detection', 'silence_detection', 'manual_timestamps'];
@@ -36,6 +39,14 @@ class VideoIngestDTO
 
     public static function fromArray(array $data): self
     {
+        $autoPublish = isset($data['auto_publish'])
+            ? filter_var($data['auto_publish'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? true
+            : true;
+
+        $platforms = array_key_exists('platforms', $data) && is_array($data['platforms'])
+            ? array_values($data['platforms'])
+            : ['tiktok', 'instagram', 'youtube'];
+
         return new self(
             sourceUrl: $data['source_url'],
             strategy: $data['strategy'] ?? 'fixed_interval',
@@ -43,9 +54,13 @@ class VideoIngestDTO
             maxDurationSeconds: (int) ($data['max_duration'] ?? $data['max_duration_seconds'] ?? 60),
             verticalMode: $data['vertical_mode'] ?? 'blur_padding',
             title: $data['title'] ?? null,
+            autoPublish: $autoPublish,
+            platforms: $platforms,
+            caption: $data['caption'] ?? null,
             extraParams: array_diff_key($data, array_flip([
                 'source_url', 'strategy', 'interval_seconds', 'max_duration',
                 'max_duration_seconds', 'vertical_mode', 'title',
+                'auto_publish', 'platforms', 'caption',
             ]))
         );
     }
@@ -59,6 +74,9 @@ class VideoIngestDTO
             'max_duration_seconds' => $this->maxDurationSeconds,
             'vertical_mode' => $this->verticalMode,
             'title' => $this->title,
+            'auto_publish' => $this->autoPublish,
+            'platforms' => $this->platforms,
+            'caption' => $this->caption,
             'extra_params' => $this->extraParams,
         ];
     }

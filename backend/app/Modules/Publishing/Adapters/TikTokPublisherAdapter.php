@@ -28,7 +28,7 @@ class TikTokPublisherAdapter extends AbstractPublisherAdapter
         }
 
         // Check for mock mode or missing live credentials
-        if (config('social.mock_mode') || $account->is_mock || empty(config('social.tiktok.client_key'))) {
+        if (config('social.mock_mode') || $account->is_mock || empty($account->access_token)) {
             $mock = new MockSocialAdapter(SocialAccount::PLATFORM_TIKTOK);
 
             return $mock->publish($clip, $account, $options);

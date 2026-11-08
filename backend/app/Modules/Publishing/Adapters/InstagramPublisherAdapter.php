@@ -27,7 +27,7 @@ class InstagramPublisherAdapter extends AbstractPublisherAdapter
             return $clipError;
         }
 
-        if (config('social.mock_mode') || $account->is_mock || empty(config('social.instagram.client_id'))) {
+        if (config('social.mock_mode') || $account->is_mock || empty($account->access_token)) {
             $mock = new MockSocialAdapter(SocialAccount::PLATFORM_INSTAGRAM);
 
             return $mock->publish($clip, $account, $options);

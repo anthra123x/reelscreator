@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Modules\SocialAccounts\Models\SocialAccount;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class SocialAccountService
@@ -55,6 +56,104 @@ class SocialAccountService
     }
 
     /**
+     * Connect social account(s) in an agile and idempotent manner.
+     *
+     * @param  string  $platform  'tiktok'|'instagram'|'youtube'|'all'
+     * @param  string  $mode  'auto'|'env'|'mock'|'direct'
+     * @param  array<string, mixed>  $options
+     * @return Collection<int, SocialAccount>
+     */
+    public function simpleConnect(
+        string $platform,
+        string $mode = 'auto',
+        array $options = [],
+        ?string $userId = null
+    ): Collection {
+        $userId = $this->resolveUserId($userId);
+        $mode = in_array($mode, ['auto', 'env', 'mock', 'direct'], true) ? $mode : 'auto';
+
+        $targetPlatforms = ($platform === 'all')
+            ? SocialAccount::SUPPORTED_PLATFORMS
+            : [$platform];
+
+        return DB::transaction(function () use ($targetPlatforms, $mode, $options, $userId) {
+            $connectedAccounts = new Collection;
+
+            foreach ($targetPlatforms as $plat) {
+                $existing = SocialAccount::where('user_id', $userId)
+                    ->where('platform', $plat)
+                    ->first();
+
+                $effectiveMode = $mode;
+                if ($mode === 'auto') {
+                    $hasEnvToken = ! empty(config("social.{$plat}.access_token"));
+                    $mockModeDisabled = ! config('social.mock_mode', false);
+                    if ($hasEnvToken && $mockModeDisabled) {
+                        $effectiveMode = 'env';
+                    } else {
+                        $effectiveMode = 'mock';
+                    }
+                }
+
+                if ($effectiveMode === 'env') {
+                    $envToken = config("social.{$plat}.access_token");
+                    if (! empty($envToken)) {
+                        $accessToken = $envToken;
+                        $refreshToken = config("social.{$plat}.refresh_token");
+                        $username = $options['username'] ?? config("social.{$plat}.username") ?? "{$plat}_creator";
+                        $platformUserId = config("social.{$plat}.account_id")
+                            ?? ($existing && ! str_starts_with($existing->platform_user_id, 'mock_')
+                                ? $existing->platform_user_id
+                                : "env_{$plat}_".substr(md5($accessToken), 0, 10));
+                        $expiresAt = Carbon::now()->addDays(60);
+                    } else {
+                        $effectiveMode = 'mock';
+                    }
+                }
+
+                if ($effectiveMode === 'direct') {
+                    $accessToken = $options['access_token'] ?? ('direct_token_'.Str::random(32));
+                    $refreshToken = $options['refresh_token'] ?? null;
+                    $username = $options['username'] ?? config("social.{$plat}.username", "{$plat}_creator");
+                    $platformUserId = $options['platform_user_id']
+                        ?? ($existing && ! str_starts_with($existing->platform_user_id, 'mock_')
+                            ? $existing->platform_user_id
+                            : "direct_{$plat}_".Str::random(10));
+                    $expiresAt = Carbon::now()->addDays(60);
+                }
+
+                if ($effectiveMode === 'mock') {
+                    $accessToken = 'mock_access_token_'.Str::random(32);
+                    $refreshToken = 'mock_refresh_token_'.Str::random(32);
+                    $username = $options['username'] ?? config("social.{$plat}.username", "mock_{$plat}_creator");
+                    $platformUserId = ($existing && str_starts_with($existing->platform_user_id, 'mock_'))
+                        ? $existing->platform_user_id
+                        : "mock_{$plat}_".Str::random(12);
+                    $expiresAt = Carbon::now()->addDays(30);
+                }
+
+                $account = SocialAccount::updateOrCreate(
+                    [
+                        'user_id' => $userId,
+                        'platform' => $plat,
+                    ],
+                    [
+                        'platform_user_id' => $platformUserId,
+                        'platform_username' => $username,
+                        'access_token' => $accessToken,
+                        'refresh_token' => $refreshToken,
+                        'expires_at' => $expiresAt,
+                    ]
+                );
+
+                $connectedAccounts->push($account);
+            }
+
+            return $connectedAccounts;
+        });
+    }
+
+    /**
      * Save or update OAuth credentials.
      */
     public function saveOAuthAccount(string $platform, array $tokenData, ?string $userId = null): SocialAccount
@@ -95,6 +194,23 @@ class SocialAccountService
         );
 
         return $user->id;
+    }
+
+    /**
+     * Get active connected platforms for user, defaulting to supported platforms.
+     *
+     * @return string[]
+     */
+    public function getActivePlatforms(?string $userId = null): array
+    {
+        $userId = $this->resolveUserId($userId);
+        $connected = SocialAccount::where('user_id', $userId)
+            ->pluck('platform')
+            ->unique()
+            ->values()
+            ->all();
+
+        return ! empty($connected) ? $connected : SocialAccount::SUPPORTED_PLATFORMS;
     }
 
     /**

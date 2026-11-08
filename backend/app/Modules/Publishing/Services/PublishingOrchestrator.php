@@ -15,8 +15,11 @@ use App\Modules\Publishing\Jobs\PublishToYouTubeJob;
 use App\Modules\Publishing\Models\Publication;
 use App\Modules\Publishing\Models\PublishingLog;
 use App\Modules\SocialAccounts\Models\SocialAccount;
+use App\Modules\SocialAccounts\Services\SocialAccountService;
+use App\Modules\Videos\Models\Video;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
@@ -145,6 +148,77 @@ class PublishingOrchestrator
         return [
             'publication_ids' => $publicationIds,
             'status' => 'queued',
+        ];
+    }
+
+    /**
+     * Publish all clips associated with a video across active social platforms.
+     *
+     * @param  string[]|null  $platforms
+     * @return array{
+     *     publication_ids: string[],
+     *     publications: Collection|array,
+     *     published_platforms: string[],
+     *     dispatched_count: int,
+     *     status: string
+     * }
+     */
+    public function publishVideoClips(
+        Video $video,
+        ?array $platforms = null,
+        ?string $caption = null,
+        ?string $userId = null
+    ): array {
+        $userId = $userId ?? $video->user_id ?? (User::first() ?? User::firstOrCreate(
+            ['email' => 'default@reelforge.internal'],
+            [
+                'name' => 'Default Operator',
+                'password' => bcrypt(Str::random(32)),
+            ]
+        ))->id;
+
+        $socialAccountService = app(SocialAccountService::class);
+
+        if (empty($platforms)) {
+            $platforms = $video->metadata['platforms'] ?? null;
+        }
+        if (empty($platforms)) {
+            $platforms = $socialAccountService->getActivePlatforms($userId);
+        }
+
+        $caption = $caption ?? $video->metadata['caption'] ?? $video->title;
+
+        $clips = $video->clips()->get();
+        if ($clips->isEmpty()) {
+            return [
+                'publication_ids' => [],
+                'publications' => [],
+                'published_platforms' => $platforms,
+                'dispatched_count' => 0,
+                'status' => 'no_clips',
+            ];
+        }
+
+        $allPublicationIds = [];
+
+        foreach ($clips as $clip) {
+            $clipCaption = $caption ?? $clip->title ?? $video->title;
+            $res = $this->publishClip($clip, $platforms, $clipCaption, null, $userId);
+            $allPublicationIds = array_merge($allPublicationIds, $res['publication_ids']);
+        }
+
+        $allPublicationIds = array_values(array_unique($allPublicationIds));
+
+        $publications = Publication::whereIn('id', $allPublicationIds)
+            ->with(['socialAccount'])
+            ->get();
+
+        return [
+            'publication_ids' => $allPublicationIds,
+            'publications' => $publications,
+            'published_platforms' => $platforms,
+            'dispatched_count' => count($allPublicationIds),
+            'status' => 'dispatched',
         ];
     }
 

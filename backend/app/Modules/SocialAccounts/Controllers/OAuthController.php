@@ -34,6 +34,8 @@ class OAuthController extends Controller
         $accounts = $this->accountService->listAccounts($userId);
 
         $data = $accounts->map(function (SocialAccount $account) {
+            $isExpired = $account->isExpired();
+
             return [
                 'id' => $account->id,
                 'platform' => $account->platform,
@@ -42,12 +44,72 @@ class OAuthController extends Controller
                 'connected_at' => $account->created_at?->toISOString() ?? now()->toISOString(),
                 'expires_at' => $account->expires_at?->toISOString(),
                 'is_mock' => $account->is_mock,
+                'is_active' => ! $isExpired,
+                'status' => $isExpired ? 'expired' : 'connected',
             ];
         });
 
         return response()->json([
             'data' => $data,
         ]);
+    }
+
+    /**
+     * Unified agile connect endpoint for social accounts.
+     * POST /api/social-accounts/connect
+     */
+    public function simpleConnect(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'platform' => ['required', 'string', 'in:tiktok,instagram,youtube,all'],
+            'mode' => ['nullable', 'string', 'in:auto,env,mock,direct'],
+            'username' => ['nullable', 'string', 'max:255'],
+            'access_token' => ['nullable', 'string'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'message' => 'Validation failed',
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $platform = (string) $request->input('platform');
+        $mode = (string) $request->input('mode', 'auto');
+        $userId = $request->user()?->id;
+
+        $options = [
+            'username' => $request->input('username'),
+            'access_token' => $request->input('access_token'),
+            'refresh_token' => $request->input('refresh_token'),
+        ];
+
+        $accounts = $this->accountService->simpleConnect($platform, $mode, $options, $userId);
+
+        $connectedData = $accounts->map(function (SocialAccount $account) {
+            $isExpired = $account->isExpired();
+
+            return [
+                'id' => $account->id,
+                'platform' => $account->platform,
+                'platform_username' => $account->platform_username,
+                'is_mock' => $account->is_mock,
+                'status' => $isExpired ? 'expired' : 'connected',
+                'is_active' => ! $isExpired,
+                'connected_at' => $account->created_at?->toISOString() ?? now()->toISOString(),
+            ];
+        })->values();
+
+        $response = [
+            'message' => 'Social accounts connected successfully',
+            'connected' => $connectedData,
+        ];
+
+        if ($connectedData->count() === 1) {
+            $response['account'] = $connectedData->first();
+        }
+
+        return response()->json($response, 200);
     }
 
     /**
