@@ -93,6 +93,29 @@ describe('DashboardComponent (M7 Unified Dynamic Dashboard)', () => {
     expect(metrics.connectedAccounts).toBe(2); // Only active & connected accounts
     expect(metrics.totalPublications).toBe(3);
     expect(metrics.successfulPublications).toBe(2); // published + scheduled, excluding failed
+
+    // Dynamic platforms and top reels signals
+    expect(component.platforms().length).toBeGreaterThan(0);
+    expect(component.topReels().length).toBe(3);
+  });
+
+  it('should render empty states when no accounts or clips exist', () => {
+    mockVideoService.getVideos.mockReturnValue(of({ data: [], total: 0 }));
+    mockClipService.getAllClips.mockReturnValue(of({ data: [], total: 0 }));
+    mockSocialService.getAccounts.mockReturnValue(of([]));
+    mockPublishService.getPublications.mockReturnValue(of({ data: [], total: 0 }));
+
+    component.loadDashboardData();
+    fixture.detectChanges();
+
+    expect(component.platforms().length).toBe(0);
+    expect(component.topReels().length).toBe(0);
+    expect(component.formattedTotalViews()).toBe('0');
+
+    const el: HTMLElement = fixture.nativeElement;
+    const emptyTitles = Array.from(el.querySelectorAll('.empty-title')).map(n => n.textContent);
+    expect(emptyTitles).toContain('Sin canales conectados');
+    expect(emptyTitles).toContain('Sin reels generados aún');
   });
 
   it('should render the live polling badge and autonomous workflow quick button', () => {

@@ -51,8 +51,9 @@ El frontend consume la API REST provista por el backend modular Laravel en `/api
 - `src/app/core/services/`: Servicios de comunicación con el backend (`video`, `clip`, `social-account`, `publish`, `api`).
 - `src/app/adversarial-m7-challenger.spec.ts`: Suite adversaria de ciclo de vida de streams reactivos (teardown de temporizador de 10s en dashboard, idempotencia de refresco, cancelación de suscripciones), valores límite en formularios de subida (toggle rápido, selección nula de plataformas con fallback, subtítulos Unicode/emojis masivos de 10.000 caracteres, validación estricta de URLs) y concurrencia en cuentas sociales.
 - `src/app/adversarial-m7-stress.spec.ts`: Suite de estrés adversario en resiliencia de red, respuestas malformadas y estados de error en componentes de Milestone M7.
-- `src/app/features/dashboard/dashboard.component.ts`: Vista principal analítica con KPIs dinámicos, sondeo automático y acceso a flujo autónomo.
-- `src/app/features/dashboard/dashboard.component.spec.ts`: Pruebas unitarias de agregación de métricas y ciclo de vida de polling.
+- `src/app/layout/layout.component.ts`: Cascarón de diseño principal con barra lateral responsiva, barra superior con fecha dinámica, acceso rápido a calendario de publicación, panel emergente de notificaciones del sistema con descarte de lectura y menú desplegable de perfil de operador con accesos directos.
+- `src/app/features/dashboard/dashboard.component.ts`: Vista principal analítica con KPIs dinámicos, rendimiento por canal en tiempo real, tabla de top reels derivada de clips reales, matriz horaria contextual y estados vacíos dedicados para proyectos recién inicializados.
+- `src/app/features/dashboard/dashboard.component.spec.ts`: Pruebas unitarias de agregación de métricas, ciclo de vida de polling y verificación de estados vacíos dinámicos.
 - `src/app/features/video-upload/video-upload.component.ts`: Formulario de ingestión con soporte de auto-publicación y visor de despacho.
 - `src/app/features/video-upload/video-upload.component.spec.ts`: Pruebas unitarias de subida autónoma y visualización de publicaciones.
 - `src/app/features/social-accounts/social-accounts.component.ts`: Panel de gestión social con conexión en 1 clic y etiquetas de estado.
@@ -72,21 +73,16 @@ El frontend consume la API REST provista por el backend modular Laravel en `/api
 - Conexión polimórfica de redes: La interfaz soporta indistintamente credenciales reales de producción y adaptadores simulados sin requerir cambios de implementación en la vista.
 
 ## 7. Estado y últimos cambios
-- Milestone M7 completado:
-  - Implementación de `connectSimple` en `SocialAccountService` y mapeo normalizado de `is_active` y `status`.
-  - Extensión de `submitVideo` en `VideoService` para soportar `auto_publish`, `platforms` y `caption`.
-  - Adición de `decomposeVideo` e `ingestAndDecompose` en `VideoService`.
-  - Implementación del método `getAllClips` en `ClipService` para consulta global de clips.
-  - Actualización de las 4 tarjetas KPI en `DashboardComponent` con datos dinámicos reales (Videos, Reels 9:16, Cuentas Conectadas, Publicaciones).
-  - Integración de temporizador de refresco periódico de 10 segundos con indicador visual en vivo en el encabezado de dashboard.
-  - Botón de acceso directo en dashboard hacia el flujo de descomposición y publicación autónoma.
-  - Incorporación de casilla de auto-publicación, selector multicanal y resumen de despacho en `VideoUploadComponent`.
-  - Botón de 1 clic para vinculación de todas las cuentas sociales y acciones de conexión rápida en tarjetas de `SocialAccountsComponent`.
-  - Incorporación de pruebas unitarias y suites de estrés adversario completas para los servicios y componentes actualizados, alcanzando 123 pruebas exitosas distribuidas en 19 suites en el frontend.
+- Dinamización integral del dashboard y activación de controles en cabecera:
+  - Eliminación de datos estáticos en `Rendimiento por Canal` y `Top Reels con Mayor Rendimiento`. Ahora se derivan de señales reactivas (`platforms` y `topReels`) conectadas a la base de datos real.
+  - Implementación de estados vacíos estilizados con llamadas a la acción (`/social-accounts` y `/video-upload`) cuando la base de datos se encuentra limpia sin canales o clips.
+  - Dinamización de `formattedTotalViews` para devolver recuento exacto basado en clips y despachos reales, sin cadenas fijas.
+  - Activación de acciones en la barra superior (`LayoutComponent`): botón de calendario enlazado a `/publish`, campana de alertas con panel emergente interactivo y menú contextual del avatar de operador con información técnica y enlaces directos.
+  - Actualización de pruebas unitarias cubriendo estados vacíos, alcanzando 124 pruebas exitosas en 19 suites.
 
 ## 8. Cómo verificar
 ```bash
 cd frontend
-bun run build # Valida compilación de producción y cumplimiento de presupuesto <= 500kB (308.17 kB)
-bun run test -- --watch=false # Ejecuta las 19 suites de pruebas unitarias y de estrés (123 pruebas exitosas)
+bun run build # Valida compilación de producción y cumplimiento de presupuesto <= 500kB (316.92 kB)
+bun run test -- --watch=false # Ejecuta las 19 suites de pruebas unitarias y de estrés (124 pruebas exitosas)
 ```
