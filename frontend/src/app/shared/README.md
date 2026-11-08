@@ -60,6 +60,8 @@ El módulo expone:
 - Manejo de valores nulos en pipes: Las tuberías manejan defensivamente entradas indefinidas o nulas devolviendo valores de sustitución estables.
 
 ## 7. Estado y últimos cambios
+- Implementacion de interfaz autentica de previsualizacion de redes sociales (TikTok, Instagram Reels, YouTube Shorts) con barra lateral de acciones (Like interactivo con animacion, comentarios, guardados, compartir, disco de vinilo giratorio con notas flotantes), marquesina de audio original, subtitulos con hashtags y barra de progreso temporal sincronizada al corte exacto del reel (0 a 30s).
+- Selector de modo de encuadre en tiempo real (`9:16 Completo / Center Crop` vs `Blur Padding`) e integracion limpia de IFrame sin controles de escritorio ni marcas de agua de YouTube (`controls=0`).
 - Soporte para reproducción híbrida de previsualización en `VerticalPlayerComponent` con IFrame seguro y padding difuminado 9:16 para YouTube y Vimeo sincronizado con los segundos de inicio y fin del reel.
 - Recuperación automática en `onError` hacia reproductor embebido cuando se detecta origen de YouTube, evitando bloqueos por almacenamiento estático inexistente en entornos serverless.
 - Implementación y prueba de `VerticalPlayerComponent`, `StatusPillComponent` y `SkeletonLoaderComponent`.

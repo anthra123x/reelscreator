@@ -108,7 +108,7 @@ class Clip extends Model
             $start = (int) floor($this->start_time ?? 0);
             $end = (int) ceil($this->end_time ?? ($start + 30));
 
-            return "https://www.youtube-nocookie.com/embed/{$videoId}?start={$start}&end={$end}&autoplay=1&playsinline=1&controls=1&rel=0";
+            return "https://www.youtube-nocookie.com/embed/{$videoId}?start={$start}&end={$end}&autoplay=1&playsinline=1&controls=0&rel=0&modestbranding=1&iv_load_policy=3&showinfo=0&disablekb=1&fs=0&loop=1&playlist={$videoId}";
         }
 
         // Vimeo
