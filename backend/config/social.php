@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'mock_mode' => env('SOCIAL_MOCK_MODE', true),
+    'mock_mode' => env('SOCIAL_MOCK_MODE', false),
 
     'tiktok' => [
         'client_key' => env('TIKTOK_CLIENT_KEY'),

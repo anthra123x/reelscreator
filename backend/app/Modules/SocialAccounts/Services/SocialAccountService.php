@@ -100,26 +100,28 @@ class SocialAccountService
                     if (! empty($envToken)) {
                         $accessToken = $envToken;
                         $refreshToken = config("social.{$plat}.refresh_token");
-                        $username = $options['username'] ?? config("social.{$plat}.username") ?? "{$plat}_creator";
+                        $rawUser = $options['username'] ?? config("social.{$plat}.username") ?? "{$plat}_creator";
+                        $username = ltrim(trim($rawUser), '@');
                         $platformUserId = config("social.{$plat}.account_id")
                             ?? ($existing && ! str_starts_with($existing->platform_user_id, 'mock_')
                                 ? $existing->platform_user_id
                                 : "env_{$plat}_".substr(md5($accessToken), 0, 10));
-                        $expiresAt = Carbon::now()->addDays(60);
+                        $expiresAt = Carbon::now()->addDays(90);
                     } else {
                         $effectiveMode = 'mock';
                     }
                 }
 
                 if ($effectiveMode === 'direct') {
-                    $accessToken = $options['access_token'] ?? ('direct_token_'.Str::random(32));
+                    $accessToken = $options['access_token'] ?? ('token_'.Str::random(32));
                     $refreshToken = $options['refresh_token'] ?? null;
-                    $username = $options['username'] ?? config("social.{$plat}.username", "{$plat}_creator");
+                    $rawUser = $options['username'] ?? config("social.{$plat}.username", "{$plat}_creator");
+                    $username = ltrim(trim($rawUser), '@');
                     $platformUserId = $options['platform_user_id']
                         ?? ($existing && ! str_starts_with($existing->platform_user_id, 'mock_')
                             ? $existing->platform_user_id
-                            : "direct_{$plat}_".Str::random(10));
-                    $expiresAt = Carbon::now()->addDays(60);
+                            : "act_{$plat}_".Str::random(10));
+                    $expiresAt = Carbon::now()->addDays(90);
                 }
 
                 if ($effectiveMode === 'mock') {

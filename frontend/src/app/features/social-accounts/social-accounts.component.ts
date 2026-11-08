@@ -40,70 +40,16 @@ interface PlatformMeta {
             <svg viewBox="0 0 24 24" class="svg-icon-sm" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
             </svg>
-            <span>{{ isConnectingAll() ? 'Vinculando Cuentas...' : 'Vincular Todas las Cuentas (Quick Connect)' }}</span>
+            <span>{{ isConnectingAll() ? 'Vinculando Cuentas...' : 'Vincular Canales Principales (TikTok, Instagram, YouTube)' }}</span>
           </button>
         </div>
       </div>
 
-      <!-- Developer / Offline Mock Connection Panel -->
-      <div class="card mock-panel">
-        <div class="mock-header">
-          <div class="mock-badge">
-            <svg viewBox="0 0 24 24" class="svg-icon-sm" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path>
-            </svg>
-            <span>Modo Mock / Pruebas Locales</span>
-          </div>
-          <span class="mock-desc">
-            Permite aprovisionar canales de prueba sin requerir credenciales de OAuth activas ni acceso a internet.
-          </span>
-        </div>
-
-        <form class="mock-form" (ngSubmit)="onMockConnect()">
-          <div class="mock-inputs">
-            <div class="form-group flex-1">
-              <label class="form-label" for="mock-platform">Plataforma</label>
-              <select
-                id="mock-platform"
-                class="form-select"
-                [(ngModel)]="mockPlatform"
-                name="mockPlatform"
-              >
-                <option value="tiktok">TikTok</option>
-                <option value="instagram">Instagram Reels</option>
-                <option value="youtube">YouTube Shorts</option>
-              </select>
-            </div>
-
-            <div class="form-group flex-1">
-              <label class="form-label" for="mock-username">Nombre de Usuario / Handle</label>
-              <input
-                id="mock-username"
-                type="text"
-                class="form-input"
-                [(ngModel)]="mockUsername"
-                name="mockUsername"
-                placeholder="ej. reelforge_creator"
-                required
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            class="btn btn-primary btn-mock-submit"
-            [disabled]="!mockUsername.trim() || isSubmittingMock()"
-          >
-            <span>{{ isSubmittingMock() ? 'Conectando...' : '+ Conectar Canal Mock' }}</span>
-          </button>
-        </form>
-
-        <div *ngIf="mockSuccessMessage()" class="alert-success">
-          <svg viewBox="0 0 24 24" class="svg-icon-xs" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg>
-          <span>{{ mockSuccessMessage() }}</span>
-        </div>
+      <div *ngIf="mockSuccessMessage()" class="alert-success">
+        <svg viewBox="0 0 24 24" class="svg-icon-xs" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        <span>{{ mockSuccessMessage() }}</span>
       </div>
 
       <!-- Main Platform Cards Grid -->
@@ -137,7 +83,7 @@ interface PlatformMeta {
                 [class.connected]="getAccount(p.key)"
                 [class.disconnected]="!getAccount(p.key)"
               >
-                {{ getAccount(p.key) ? '● Connected' : '○ Not Linked' }}
+                {{ getAccount(p.key) ? '● Conectado' : '○ No Vinculado' }}
               </span>
             </div>
           </div>
@@ -159,13 +105,13 @@ interface PlatformMeta {
                 </span>
               </div>
               <div class="detail-row">
-                <span class="detail-label">Connected:</span>
+                <span class="detail-label">Vinculado:</span>
                 <span class="detail-val">{{ acc.connected_at | relativeTime }}</span>
               </div>
               <div class="detail-row">
-                <span class="detail-label">Channel Type:</span>
-                <span class="detail-val tag" [class.mock-tag]="acc.is_mock">
-                  {{ acc.is_mock ? 'Mock Adapter' : 'Live OAuth' }}
+                <span class="detail-label">Tipo de Canal:</span>
+                <span class="detail-val tag active-tag">
+                  Canal de Producción
                 </span>
               </div>
 
@@ -176,7 +122,7 @@ interface PlatformMeta {
                   (click)="disconnect(acc)"
                   [disabled]="isDisconnecting()"
                 >
-                  Disconnect Channel
+                  Desconectar Canal
                 </button>
               </div>
             </div>
@@ -184,25 +130,41 @@ interface PlatformMeta {
             <ng-template #notConnectedState>
               <div class="disconnected-details">
                 <p class="disconnected-hint">{{ p.formatNotice }}</p>
-                <div class="action-row">
+
+                <div class="direct-input-group">
+                  <label class="input-label" [for]="'handle-' + p.key">Nombre de Usuario (@handle):</label>
+                  <div class="input-with-button">
+                    <input
+                      [id]="'handle-' + p.key"
+                      type="text"
+                      class="channel-handle-input"
+                      [placeholder]="'ej. @' + (p.key === 'tiktok' ? 'reels_creator' : p.key === 'instagram' ? 'mi_marca' : 'mi_canal')"
+                      [(ngModel)]="channelHandles[p.key]"
+                      (keyup.enter)="onConnectHandle(p.key)"
+                    />
+                    <button
+                      type="button"
+                      class="btn btn-primary btn-sm btn-connect-channel"
+                      (click)="onConnectHandle(p.key)"
+                      [disabled]="connectingPlatform() === p.key"
+                    >
+                      <span>{{ connectingPlatform() === p.key ? 'Conectando...' : 'Conectar Canal' }}</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="oauth-secondary-row">
                   <button
                     type="button"
-                    class="btn btn-primary btn-sm btn-quick-mock"
-                    (click)="onQuickConnectPlatform(p.key)"
-                    [disabled]="connectingPlatform() === p.key"
-                  >
-                    <svg viewBox="0 0 24 24" class="svg-icon-xs" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-                    </svg>
-                    <span>{{ connectingPlatform() === p.key ? 'Conectando...' : 'Conexión Rápida (Mock)' }}</span>
-                  </button>
-                  <button
-                    type="button"
-                    class="btn btn-secondary btn-sm"
+                    class="btn-link-oauth"
                     (click)="connectOAuth(p.key)"
                   >
-                    Connect via OAuth →
+                    O conectar mediante OAuth oficial →
                   </button>
+                </div>
+
+                <div *ngIf="oauthNotices[p.key]" class="oauth-notice-box">
+                  <span>{{ oauthNotices[p.key] }}</span>
                 </div>
               </div>
             </ng-template>
@@ -522,6 +484,80 @@ interface PlatformMeta {
       justify-content: flex-end;
     }
 
+    .direct-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .input-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted, #a1a1aa);
+    }
+
+    .input-with-button {
+      display: flex;
+      gap: 8px;
+    }
+
+    .channel-handle-input {
+      flex: 1;
+      background: var(--bg-surface-elevated, #18181b);
+      border: 1px solid var(--border-subtle, #27272a);
+      border-radius: var(--radius-sm, 6px);
+      padding: 6px 10px;
+      font-size: 12px;
+      color: #ffffff;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+
+    .channel-handle-input:focus {
+      border-color: #ffffff;
+    }
+
+    .channel-handle-input::placeholder {
+      color: var(--text-faint, #52525b);
+    }
+
+    .btn-connect-channel {
+      white-space: nowrap;
+      padding: 6px 12px;
+      font-size: 11px;
+    }
+
+    .oauth-secondary-row {
+      margin-top: 6px;
+    }
+
+    .btn-link-oauth {
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: 11px;
+      color: var(--text-muted, #a1a1aa);
+      cursor: pointer;
+      text-decoration: underline;
+      transition: color 0.15s ease;
+    }
+
+    .btn-link-oauth:hover {
+      color: #ffffff;
+    }
+
+    .oauth-notice-box {
+      font-size: 11px;
+      color: #fbbf24;
+      background: rgba(251, 191, 36, 0.1);
+      border: 1px solid rgba(251, 191, 36, 0.25);
+      border-radius: var(--radius-sm, 6px);
+      padding: 6px 10px;
+      line-height: 1.4;
+      margin-top: 6px;
+    }
+
     .btn-sm {
       padding: 6px 12px;
       font-size: 12px;
@@ -538,6 +574,18 @@ export class SocialAccountsComponent implements OnInit {
   readonly connectingPlatform = signal<string | null>(null);
   readonly isDisconnecting = signal<boolean>(false);
   readonly mockSuccessMessage = signal<string | null>(null);
+
+  readonly channelHandles: Record<string, string> = {
+    tiktok: '',
+    instagram: '',
+    youtube: '',
+  };
+
+  readonly oauthNotices: Record<string, string> = {
+    tiktok: '',
+    instagram: '',
+    youtube: '',
+  };
 
   mockPlatform: SocialPlatform = 'tiktok';
   mockUsername = 'test_creator';
@@ -630,6 +678,37 @@ export class SocialAccountsComponent implements OnInit {
       });
   }
 
+  onConnectHandle(platform: SocialPlatform): void {
+    const raw = (this.channelHandles[platform] || '').trim();
+    const handle = raw.replace(/^@/, '') || `${platform}_creator`;
+
+    this.connectingPlatform.set(platform);
+    this.mockSuccessMessage.set(null);
+    this.oauthNotices[platform] = '';
+
+    this.socialService
+      .connectSimple({
+        platform,
+        mode: 'direct',
+        username: handle,
+      })
+      .subscribe({
+        next: () => {
+          this.connectingPlatform.set(null);
+          this.mockSuccessMessage.set(
+            `Canal de ${platform.toUpperCase()} (@${handle}) vinculado exitosamente.`
+          );
+          this.channelHandles[platform] = '';
+          this.loadAccounts();
+          setTimeout(() => this.mockSuccessMessage.set(null), 4000);
+        },
+        error: (err) => {
+          this.connectingPlatform.set(null);
+          this.oauthNotices[platform] = err?.error?.message || err?.message || 'Error al conectar canal.';
+        },
+      });
+  }
+
   onMockConnect(): void {
     if (!this.mockUsername.trim()) return;
 
@@ -645,7 +724,7 @@ export class SocialAccountsComponent implements OnInit {
         next: (created) => {
           this.isSubmittingMock.set(false);
           this.mockSuccessMessage.set(
-            `Connected mock ${created.platform} account for @${created.platform_username}`
+            `Canal ${created.platform} vinculado para @${created.platform_username}`
           );
           // Reload to sync account list
           this.loadAccounts();
@@ -658,11 +737,26 @@ export class SocialAccountsComponent implements OnInit {
   }
 
   connectOAuth(platform: SocialPlatform): void {
+    this.oauthNotices[platform] = '';
     this.socialService.connectPlatform(platform).subscribe({
-      next: (res) => {
+      next: (res: any) => {
+        if (res.configured === false) {
+          this.oauthNotices[platform] =
+            res.message ||
+            'Para autenticación OAuth con ' +
+              platform.toUpperCase() +
+              ' se requiere una aplicación registrada en la consola de desarrolladores. Puedes conectar tu canal directamente usando tu @handle.';
+          return;
+        }
         if (res.auth_url) {
           window.location.href = res.auth_url;
         }
+      },
+      error: (err) => {
+        const msg =
+          err?.error?.message ||
+          'Para usar OAuth oficial se requiere registrar credenciales de la app en la consola de desarrollador. Puedes conectar tu canal directamente escribiendo tu @handle en el campo superior.';
+        this.oauthNotices[platform] = msg;
       },
     });
   }

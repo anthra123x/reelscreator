@@ -37,20 +37,37 @@ class ProcessVideoJob implements ShouldQueue
         try {
             $video->transitionTo(Video::STATUS_PROCESSING);
 
-            $payload = [
-                'job_id' => $video->id,
-                'source_url' => $video->source_url,
-                'strategy' => $this->params['strategy'] ?? 'fixed_interval',
-                'interval_seconds' => (int) ($this->params['interval_seconds'] ?? 30),
-                'max_duration_seconds' => (int) ($this->params['max_duration_seconds'] ?? 60),
-                'aspect_ratio' => '9:16',
-                'vertical_mode' => $this->params['vertical_mode'] ?? 'blur_padding',
-                'output_dir' => "media/clips/{$video->id}",
-                'webhook_url' => url("/api/internal/jobs/{$video->id}/callback"),
-            ];
+            $rustUrl = config('services.rust_engine.url', 'http://localhost:3000');
+            $canAttemptRust = ! empty($rustUrl) && (! app()->isProduction() || ! str_contains($rustUrl, 'localhost'));
+            $isRustEngineAvailable = false;
 
-            $response = $rustClient->submitJob($payload);
-            Log::info("[ProcessVideoJob] Submitted job {$video->id} to Rust engine: ".json_encode($response));
+            if ($canAttemptRust) {
+                $isRustEngineAvailable = $rustClient->isAvailable(1.5);
+            }
+
+            if ($isRustEngineAvailable) {
+                $payload = [
+                    'job_id' => $video->id,
+                    'source_url' => $video->source_url,
+                    'strategy' => $this->params['strategy'] ?? 'fixed_interval',
+                    'interval_seconds' => (int) ($this->params['interval_seconds'] ?? 30),
+                    'max_duration_seconds' => (int) ($this->params['max_duration_seconds'] ?? 60),
+                    'aspect_ratio' => '9:16',
+                    'vertical_mode' => $this->params['vertical_mode'] ?? 'blur_padding',
+                    'output_dir' => "media/clips/{$video->id}",
+                    'webhook_url' => url("/api/internal/jobs/{$video->id}/callback"),
+                ];
+
+                $response = $rustClient->submitJob($payload);
+                Log::info("[ProcessVideoJob] Submitted job {$video->id} to Rust engine: ".json_encode($response));
+
+                return;
+            }
+
+            // Standalone / Cloud autonomous clipping execution
+            Log::info("[ProcessVideoJob] Rust Axum engine offline or in serverless environment; executing direct decomposition for {$this->videoId}");
+            $ingestService = app(\App\Modules\Videos\Services\VideoIngestService::class);
+            $ingestService->decomposeVideo($video, $this->params);
         } catch (Throwable $e) {
             Log::error("[ProcessVideoJob] Processing failed for video {$this->videoId}: ".$e->getMessage());
             $video->transitionTo(Video::STATUS_FAILED, $e->getMessage());

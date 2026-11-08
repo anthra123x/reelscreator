@@ -33,6 +33,20 @@ class RustProcessorClient
     }
 
     /**
+     * Rapid check to determine if the Rust Axum engine is online and responding.
+     */
+    public function isAvailable(float $timeoutSeconds = 1.5): bool
+    {
+        try {
+            $response = Http::timeout($timeoutSeconds)->get("{$this->baseUrl}/health");
+
+            return $response->successful();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
      * Submit video processing job asynchronously to Axum engine.
      *
      * @param array{

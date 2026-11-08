@@ -122,6 +122,15 @@ class OAuthController extends Controller
             return response()->json(['message' => "Unsupported platform: {$platform}"], 400);
         }
 
+        // Check if real developer credentials are set
+        $clientKey = match ($platform) {
+            SocialAccount::PLATFORM_TIKTOK => config('social.tiktok.client_key'),
+            SocialAccount::PLATFORM_INSTAGRAM => config('social.instagram.client_id'),
+            SocialAccount::PLATFORM_YOUTUBE => config('social.youtube.client_id'),
+        };
+
+        $isConfigured = ! empty($clientKey) && ! str_starts_with((string) $clientKey, 'mock_');
+
         $state = Str::random(40);
         session(['oauth_state' => $state]);
 
@@ -134,7 +143,9 @@ class OAuthController extends Controller
         return response()->json([
             'auth_url' => $authUrl,
             'state' => $state,
-        ]);
+            'configured' => $isConfigured,
+            'message' => $isConfigured ? null : "Para autenticación OAuth con {$platform} se requiere una aplicación registrada en la consola de desarrolladores. Puedes conectar tu canal directamente usando tu @handle.",
+        ], 200);
     }
 
     /**

@@ -132,6 +132,9 @@ Este modulo provee a la capa de publicacion (`Publishing`) las credenciales auto
 - **Compatibilidad con esquemas PostgreSQL**: La tabla `social_accounts` cuenta con indice unico `uq_user_platform_acc` (`user_id, platform, platform_user_id`). Al reutilizar o actualizar identificadores de plataforma de forma controlada, nunca se producen colisiones de clave unica.
 
 ## 7. Estado y últimos cambios
+- Verificacion de credenciales de desarrollador en `OAuthController::connect` para prevenir redirecciones invalidas a TikTok u otras plataformas cuando falten claves de API registradas en consola.
+- Integracion de vinculacion directa por handle `@usuario` (`mode: direct`) con `is_mock = false` y vigencia de 90 dias.
+- Eliminacion de interfaces de prueba sintetica o paneles de simulacion en frontend, consolidando la experiencia en conexion directa de canales de produccion.
 - Implementacion del endpoint agil unificado `POST /api/social-accounts/connect` con soporte para modos `auto`, `env`, `mock` y `direct`, asi como sincronizacion masiva mediante `platform: "all"`.
 - Incorporacion de claves de tokens directos en `backend/config/social.php` (`TIKTOK_ACCESS_TOKEN`, `INSTAGRAM_ACCESS_TOKEN`, `YOUTUBE_ACCESS_TOKEN` y metadatos asociados).
 - Actualizacion de la condicion de delegacion en `TikTokPublisherAdapter`, `InstagramPublisherAdapter` y `YouTubePublisherAdapter` para admitir tokens directos en modo real.

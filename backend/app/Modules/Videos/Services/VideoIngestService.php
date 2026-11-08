@@ -11,6 +11,8 @@ use App\Modules\Videos\Jobs\DownloadVideoJob;
 use App\Modules\Videos\Models\Video;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -34,11 +36,14 @@ class VideoIngestService
             $userId = $user->id;
         }
 
+        $extractedMeta = $this->extractMetadata($dto->sourceUrl);
+        $title = $dto->title ?: ($extractedMeta['title'] ?: 'Video - '.date('d M Y H:i'));
+
         $video = new Video;
         $video->id = (string) Str::uuid();
         $video->user_id = $userId;
         $video->source_url = $dto->sourceUrl;
-        $video->title = $dto->title ?? 'Untitled Video';
+        $video->title = $title;
         $video->status = Video::STATUS_PENDING;
         $video->metadata = array_merge([
             'strategy' => $dto->strategy,
@@ -48,6 +53,9 @@ class VideoIngestService
             'auto_publish' => $dto->autoPublish,
             'platforms' => $dto->platforms,
             'caption' => $dto->caption,
+            'thumbnail_url' => $extractedMeta['thumbnail_url'],
+            'author' => $extractedMeta['author'],
+            'duration' => $extractedMeta['duration'],
         ], $dto->extraParams);
 
         $video->save();
@@ -62,6 +70,64 @@ class VideoIngestService
         }
 
         return $video;
+    }
+
+    /**
+     * Extract title, thumbnail, author and estimated duration from URL via oEmbed or scrapers.
+     *
+     * @return array{title: ?string, thumbnail_url: ?string, author: ?string, duration: float}
+     */
+    public function extractMetadata(string $url): array
+    {
+        $meta = [
+            'title' => null,
+            'thumbnail_url' => null,
+            'author' => null,
+            'duration' => 90.0,
+        ];
+
+        try {
+            // YouTube (youtube.com, youtu.be, shorts)
+            if (preg_match('/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]+)/i', $url, $matches)) {
+                $videoId = $matches[1];
+                $meta['thumbnail_url'] = "https://i.ytimg.com/vi/{$videoId}/hqdefault.jpg";
+                $oembedUrl = 'https://www.youtube.com/oembed?url='.urlencode($url).'&format=json';
+                $res = Http::timeout(4)->get($oembedUrl);
+                if ($res->successful()) {
+                    $json = $res->json();
+                    $meta['title'] = $json['title'] ?? null;
+                    $meta['author'] = $json['author_name'] ?? null;
+                }
+            } elseif (str_contains($url, 'tiktok.com')) {
+                $oembedUrl = 'https://www.tiktok.com/oembed?url='.urlencode($url);
+                $res = Http::timeout(4)->get($oembedUrl);
+                if ($res->successful()) {
+                    $json = $res->json();
+                    $meta['title'] = $json['title'] ?? null;
+                    $meta['author'] = $json['author_name'] ?? null;
+                    $meta['thumbnail_url'] = $json['thumbnail_url'] ?? null;
+                }
+            } elseif (str_contains($url, 'vimeo.com')) {
+                $oembedUrl = 'https://vimeo.com/api/oembed.json?url='.urlencode($url);
+                $res = Http::timeout(4)->get($oembedUrl);
+                if ($res->successful()) {
+                    $json = $res->json();
+                    $meta['title'] = $json['title'] ?? null;
+                    $meta['thumbnail_url'] = $json['thumbnail_url'] ?? null;
+                }
+            } else {
+                $parsed = parse_url($url);
+                $path = $parsed['path'] ?? '';
+                $filename = basename($path);
+                if ($filename && strlen($filename) > 3) {
+                    $meta['title'] = ucfirst(str_replace(['-', '_', '.'], ' ', pathinfo($filename, PATHINFO_FILENAME)));
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning("[VideoIngestService] Metadata extraction failed for {$url}: ".$e->getMessage());
+        }
+
+        return $meta;
     }
 
     /**
@@ -203,7 +269,7 @@ class VideoIngestService
                 $clip->id = (string) Str::uuid();
                 $clip->video_id = $video->id;
                 $clip->file_path = "media/clips/{$video->id}/clip_{$clipNumber}.mp4";
-                $clip->thumbnail_path = "media/clips/{$video->id}/thumb_{$clipNumber}.jpg";
+                $clip->thumbnail_path = $video->metadata['thumbnail_url'] ?? "media/clips/{$video->id}/thumb_{$clipNumber}.jpg";
                 $clip->title = ($video->title ?? 'Reel').' - Reel #'.($i + 1);
                 $clip->start_time = $start;
                 $clip->end_time = $end;

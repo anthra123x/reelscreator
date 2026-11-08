@@ -47,10 +47,10 @@ Adicionalmente, mantiene la maquina de estados de los videos (`pending`, `downlo
 - `Controllers/VideoController.php`: Controlador REST que valida entradas, expone endpoints de ingesta, descomposicion autonoma y delegacion al servicio.
 - `DTOs/VideoIngestDTO.php`: Objeto inmutable de transferencia para sanitizacion de parametros de corte, auto-publicacion y plataformas.
 - `Jobs/DownloadVideoJob.php`: Trabajo encolado que gestiona la transicion a estado de descarga y desencadena el procesamiento.
-- `Jobs/ProcessVideoJob.php`: Trabajo encolado que remite la orden al motor Rust via `RustProcessorClient`.
+- `Jobs/ProcessVideoJob.php`: Trabajo encolado que remite la orden al motor Rust via `RustProcessorClient`, con fallback inmediato a descomposicion autonoma si el motor Axum no se encuentra disponible en ejecucion serverless.
 - `Models/Video.php`: Modelo Eloquent con clave primaria UUID, metadatos JSONB y maquina de estados estricta.
 - `Routes/api.php`: Definicion de rutas API publicas e internas del modulo.
-- `Services/VideoIngestService.php`: Logica de negocio central para persistencia, descomposicion 9:16 (`decomposeVideo`), sondeo y procesamiento de webhooks con auto-publicacion.
+- `Services/VideoIngestService.php`: Logica de negocio central para persistencia, extraccion automatica de metadatos oEmbed (YouTube, TikTok, Vimeo), descomposicion 9:16 (`decomposeVideo`), sondeo y procesamiento de webhooks con auto-publicacion.
 
 ## 5. Lógica y flujo
 1. El cliente envia `POST /api/videos/decompose` o `POST /api/videos/{id}/decompose` con opciones de corte y plataformas.
@@ -70,6 +70,9 @@ Adicionalmente, mantiene la maquina de estados de los videos (`pending`, `downlo
 ## 7. Estado y últimos cambios
 - **Estado**: Funcionalidad completada y verificada al 100% en suites unitarias y de caracteristicas.
 - **Cambios recientes**:
+  - Incorporacion de `VideoIngestService::extractMetadata` para obtener titulos reales y miniaturas via oEmbed para YouTube, TikTok y Vimeo.
+  - Implementacion de fallback tolerante a fallos en `ProcessVideoJob` usando `RustProcessorClient::isAvailable` para ejecutar descomposicion autonoma directa sin demoras de cURL timeout en entornos cloud serverless.
+  - Generacion de miniaturas y titulos enriquecidos en `decomposeVideo` para clips 9:16.
   - Implementacion de `POST /api/videos/{id}/decompose` y `POST /api/videos/decompose` en `VideoController` y `Routes/api.php`.
   - Extension de `VideoIngestDTO` y `VideoController::store` para capturar `auto_publish`, `platforms` y `caption`.
   - Creacion del metodo `VideoIngestService::decomposeVideo` con particionado uniforme 9:16 (1080x1920) y limite de 60s.
