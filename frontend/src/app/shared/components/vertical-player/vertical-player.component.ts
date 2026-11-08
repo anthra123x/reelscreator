@@ -184,7 +184,7 @@ export type SlicingMode = 'cover' | 'blur';
             #videoElement
             class="video-player"
             [class.hidden-player]="playerMode() === 'embed'"
-            [src]="src"
+            [src]="playerMode() === 'video' ? src : ''"
             [poster]="poster"
             playsinline
             [loop]="loop"
@@ -204,7 +204,7 @@ export type SlicingMode = 'cover' | 'blur';
           </div>
 
           <!-- Video Error Notice Overlay (required by unit test contracts) -->
-          <div *ngIf="hasError()" class="error-overlay">
+          <div *ngIf="playerMode() === 'video' && hasError()" class="error-overlay">
             <svg viewBox="0 0 24 24" class="error-icon-svg" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
               <line x1="12" y1="9" x2="12" y2="13"></line>
@@ -1484,7 +1484,7 @@ export class VerticalPlayerComponent implements OnInit, OnChanges, OnDestroy {
           this.endTime ?? this.clip?.end_time ?? start + (this.clip?.duration || 30)
         );
         // controls=0 & disablekb=1 & modestbranding=1 eliminates the desktop YouTube playback bar and 22-min timeline
-        const url = `https://www.youtube-nocookie.com/embed/${videoId}?start=${start}&end=${end}&autoplay=1&playsinline=1&controls=0&rel=0&modestbranding=1&iv_load_policy=3&showinfo=0&disablekb=1&fs=0&loop=1&playlist=${videoId}`;
+        const url = `https://www.youtube-nocookie.com/embed/${videoId}?start=${start}&end=${end}&autoplay=1&playsinline=1&controls=0&rel=0&modestbranding=1&iv_load_policy=3&showinfo=0&disablekb=1&fs=0&loop=1&playlist=${videoId}&mute=1`;
         this.trustedEmbedUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(url));
         this.playerMode.set('embed');
         this.externalUrl.set(`https://www.youtube.com/watch?v=${videoId}&t=${start}s`);
@@ -1497,7 +1497,7 @@ export class VerticalPlayerComponent implements OnInit, OnChanges, OnDestroy {
       if (vimeoMatch) {
         const vimeoId = vimeoMatch[1];
         const start = Math.floor(this.startTime ?? this.clip?.start_time ?? 0);
-        const url = `https://player.vimeo.com/video/${vimeoId}?autoplay=1&controls=0#t=${start}s`;
+        const url = `https://player.vimeo.com/video/${vimeoId}?autoplay=1&controls=0&muted=1#t=${start}s`;
         this.trustedEmbedUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(url));
         this.playerMode.set('embed');
         this.externalUrl.set(`https://vimeo.com/${vimeoId}#t=${start}s`);
@@ -1564,25 +1564,8 @@ export class VerticalPlayerComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   onError(): void {
-    // If native video failed but we have a source URL to embed, attempt recovery
-    if (this.playerMode() !== 'embed') {
-      const rawSource = this.sourceUrl || this.clip?.video?.source_url || '';
-      const ytMatch = rawSource.match(
-        /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i
-      );
-      if (ytMatch) {
-        const videoId = ytMatch[1];
-        const start = Math.floor(this.startTime ?? this.clip?.start_time ?? 0);
-        const end = Math.ceil(
-          this.endTime ?? this.clip?.end_time ?? start + (this.clip?.duration || 30)
-        );
-        const url = `https://www.youtube-nocookie.com/embed/${videoId}?start=${start}&end=${end}&autoplay=1&playsinline=1&controls=0&rel=0&modestbranding=1&iv_load_policy=3&showinfo=0&disablekb=1&fs=0&loop=1&playlist=${videoId}`;
-        this.trustedEmbedUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(url));
-        this.playerMode.set('embed');
-        this.externalUrl.set(`https://www.youtube.com/watch?v=${videoId}&t=${start}s`);
-        this.hasError.set(false);
-        return;
-      }
+    if (this.playerMode() === 'embed') {
+      return;
     }
 
     this.hasError.set(true);
