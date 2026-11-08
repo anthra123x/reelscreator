@@ -7,11 +7,16 @@ El módulo Shared reúne componentes de presentación reutilizables, tuberías d
 El módulo expone:
 - `VerticalPlayerComponent` (`app-vertical-player`):
   - Entradas (`@Input`):
-    - `src`: URL del archivo de video MP4.
+    - `src`: URL del archivo de video MP4 o fuente de medios.
     - `poster`: URL de la miniatura estática.
     - `title`: Título del clip en reproducción.
     - `loop`: Bandera de repetición continua (por defecto `true`).
     - `showPublish`: Habilita botón de publicación rápida dentro del reproductor.
+    - `clip`: Objeto de clip completo (`Clip`) con metadatos de inicio, fin y relación con el video original.
+    - `sourceUrl`: URL de la fuente de video (YouTube, Vimeo o enlace directo).
+    - `startTime`: Segundo de inicio del corte.
+    - `endTime`: Segundo de finalización del corte.
+    - `embedUrl`: URL segura pre-calculada de inserción IFrame para proveedores externos.
   - Salidas (`@Output`):
     - `close`: Emite evento al cerrar el modal (`EventEmitter<void>`).
     - `publish`: Emite evento para iniciar publicación del clip (`EventEmitter<void>`).
@@ -55,6 +60,8 @@ El módulo expone:
 - Manejo de valores nulos en pipes: Las tuberías manejan defensivamente entradas indefinidas o nulas devolviendo valores de sustitución estables.
 
 ## 7. Estado y últimos cambios
+- Soporte para reproducción híbrida de previsualización en `VerticalPlayerComponent` con IFrame seguro y padding difuminado 9:16 para YouTube y Vimeo sincronizado con los segundos de inicio y fin del reel.
+- Recuperación automática en `onError` hacia reproductor embebido cuando se detecta origen de YouTube, evitando bloqueos por almacenamiento estático inexistente en entornos serverless.
 - Implementación y prueba de `VerticalPlayerComponent`, `StatusPillComponent` y `SkeletonLoaderComponent`.
 - Creación de pruebas unitarias exhaustivas para `DurationPipe` y `RelativeTimePipe` con 100% de aserciones válidas.
 - Agregada suite de pruebas adversariales para DurationPipe y RelativeTimePipe comprobando valores negativos, 100+ horas, NaN, fechas futuras y epoch 0.

@@ -40,6 +40,7 @@ class Clip extends Model
     protected $appends = [
         'file_url',
         'thumbnail_url',
+        'embed_url',
     ];
 
     protected function casts(): array
@@ -63,6 +64,15 @@ class Clip extends Model
             return $this->file_path;
         }
 
+        // If parent video source_url is a direct video media stream, append media fragments
+        $sourceUrl = $this->relationLoaded('video') ? $this->video?->source_url : null;
+        if ($sourceUrl && preg_match('/\.(mp4|webm|ogg|mov)(\?.*)?$/i', $sourceUrl)) {
+            $start = $this->start_time ?? 0;
+            $end = $this->end_time ?? ($start + 30);
+
+            return "{$sourceUrl}#t={$start},{$end}";
+        }
+
         return Storage::url($this->file_path);
     }
 
@@ -80,6 +90,36 @@ class Clip extends Model
         }
 
         return Storage::url($this->thumbnail_path);
+    }
+
+    /**
+     * Compute safe embed URL for external video providers (YouTube, Vimeo) with start and end times.
+     */
+    public function getEmbedUrlAttribute(): ?string
+    {
+        $sourceUrl = $this->relationLoaded('video') ? $this->video?->source_url : null;
+        if (! $sourceUrl) {
+            return null;
+        }
+
+        // YouTube
+        if (preg_match('/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i', $sourceUrl, $matches)) {
+            $videoId = $matches[1];
+            $start = (int) floor($this->start_time ?? 0);
+            $end = (int) ceil($this->end_time ?? ($start + 30));
+
+            return "https://www.youtube-nocookie.com/embed/{$videoId}?start={$start}&end={$end}&autoplay=1&playsinline=1&controls=1&rel=0";
+        }
+
+        // Vimeo
+        if (preg_match('/vimeo\.com\/(?:video\/)?([0-9]+)/i', $sourceUrl, $matches)) {
+            $vimeoId = $matches[1];
+            $start = (int) floor($this->start_time ?? 0);
+
+            return "https://player.vimeo.com/video/{$vimeoId}?autoplay=1#t={$start}s";
+        }
+
+        return null;
     }
 
     public function video(): BelongsTo

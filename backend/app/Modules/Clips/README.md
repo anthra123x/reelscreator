@@ -33,7 +33,7 @@ El modulo `Clips` administra los fragmentos de video cortos generados en proporc
 ## 4. Mapa de archivos
 - `Controllers/ClipController.php`: Controlador REST para consulta, modificacion y eliminacion de clips.
 - `DTOs/UpdateClipDTO.php`: Objeto de transferencia para sanitizacion de atributos editables.
-- `Models/Clip.php`: Modelo Eloquent con clave UUID, metadatos JSONB (resolucion 1080x1920, `aspect_ratio: '9:16'`) y accessors de URLs (`file_url`, `thumbnail_url`).
+- `Models/Clip.php`: Modelo Eloquent con clave UUID, metadatos JSONB (resolucion 1080x1920, `aspect_ratio: '9:16'`) y accessors de URLs (`file_url`, `thumbnail_url`, `embed_url`).
 - `Routes/api.php`: Rutas REST asociadas a clips y agrupacion por video.
 - `Services/ClipStorageService.php`: Logica de negocio para recuperacion, actualizacion y depuracion de archivos de medios.
 
@@ -53,6 +53,9 @@ El modulo `Clips` administra los fragmentos de video cortos generados en proporc
 ## 7. Estado y últimos cambios
 - **Estado**: Funcionalidad verificada e integrada con el pipeline autonomo de descomposicion 9:16.
 - **Cambios recientes**:
+  - Incorporacion del accessor `embed_url` en `Clip.php` con resolucion segura para YouTube y Vimeo con marcas de tiempo `start` y `end`.
+  - Soporte para fuentes de streaming multimedia directas con fragmentos `#t=start,end` en `file_url`.
+  - Carga impaciente (`with('video')`) en `ClipStorageService::listByVideo` para resolucion eficiente de URLs.
   - Validacion y persistencia de geometria vertical 1080x1920 y proporcion 9:16 en metadatos de clips generados por descomposicion autonoma.
   - Garantia de limite maximo de duracion de 60 segundos por clip para compatibilidad con YouTube Shorts e Instagram Reels.
   - Incorporacion de endpoint `GET /api/clips` y metodo `listAll` en `ClipStorageService`.

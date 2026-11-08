@@ -255,6 +255,11 @@ import { DurationPipe } from '../../shared/pipes/duration.pipe';
         [src]="previewClip()!.file_url"
         [poster]="previewClip()!.thumbnail_url || undefined"
         [title]="previewClip()!.title || 'Vertical Reel Preview'"
+        [clip]="previewClip()!"
+        [sourceUrl]="previewClip()!.video?.source_url"
+        [startTime]="previewClip()!.start_time"
+        [endTime]="previewClip()!.end_time"
+        [embedUrl]="previewClip()!.embed_url"
         [showPublish]="true"
         (close)="closePreview()"
         (publish)="publishCurrentPreview()"
@@ -672,9 +677,14 @@ export class ClipsComponent implements OnInit {
   }
 
   private fetchClipsForVideo(videoId: string): void {
+    const parentVideo = this.availableVideos().find((v) => v.id === videoId);
     this.clipService.getClipsByVideo(videoId).subscribe({
       next: (data) => {
-        this.clips.set(data || []);
+        const enriched = (data || []).map((c) => ({
+          ...c,
+          video: c.video || parentVideo,
+        }));
+        this.clips.set(enriched);
         this.isLoading.set(false);
       },
       error: () => {
@@ -688,7 +698,12 @@ export class ClipsComponent implements OnInit {
     const allClips: Clip[] = [];
     for (const v of videos) {
       if (v.clips && v.clips.length > 0) {
-        allClips.push(...v.clips);
+        for (const c of v.clips) {
+          allClips.push({
+            ...c,
+            video: c.video || v,
+          });
+        }
       }
     }
     this.clips.set(allClips);
@@ -704,6 +719,12 @@ export class ClipsComponent implements OnInit {
   }
 
   openPreview(clip: Clip): void {
+    if (!clip.video && clip.video_id) {
+      const parent = this.availableVideos().find((v) => v.id === clip.video_id);
+      if (parent) {
+        clip = { ...clip, video: parent };
+      }
+    }
     this.previewClip.set(clip);
   }
 

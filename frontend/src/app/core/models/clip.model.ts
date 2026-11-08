@@ -15,6 +15,7 @@ export interface Clip {
   thumbnail_path: string | null;
   file_url: string;
   thumbnail_url: string | null;
+  embed_url?: string | null;
   title: string | null;
   start_time: number;
   end_time: number;

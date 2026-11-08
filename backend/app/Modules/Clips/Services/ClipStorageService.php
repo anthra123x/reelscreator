@@ -15,7 +15,7 @@ class ClipStorageService
      */
     public function listByVideo(string $videoId): Collection
     {
-        return Clip::where('video_id', $videoId)->orderBy('start_time')->get();
+        return Clip::with('video')->where('video_id', $videoId)->orderBy('start_time')->get();
     }
 
     /**
