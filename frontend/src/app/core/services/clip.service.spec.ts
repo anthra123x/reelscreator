@@ -54,6 +54,38 @@ describe('ClipService', () => {
     expect(clips[0].file_url).toBe('/storage/media/clips/1.mp4');
   });
 
+  it('should list all clips paginated across videos', async () => {
+    const mockClips: Clip[] = [
+      {
+        id: 'clip-1',
+        video_id: 'vid-1',
+        file_path: 'media/clips/1.mp4',
+        thumbnail_path: null,
+        file_url: '/storage/media/clips/1.mp4',
+        thumbnail_url: null,
+        title: 'Clip 1',
+        start_time: 0,
+        end_time: 30,
+        duration: 30,
+        status: 'ready',
+      },
+    ];
+    const paginatedRes = {
+      data: mockClips,
+      total: 42,
+      current_page: 1,
+      per_page: 10,
+      last_page: 5,
+    };
+
+    apiMock.get.mockReturnValue(of(paginatedRes));
+
+    const res = await firstValueFrom(service.getAllClips({ per_page: 10 }));
+    expect(res.total).toBe(42);
+    expect(res.data.length).toBe(1);
+    expect(apiMock.get).toHaveBeenCalledWith('clips', { per_page: 10 });
+  });
+
   it('should update clip metadata', async () => {
     const updatedClip: Clip = {
       id: 'clip-1',

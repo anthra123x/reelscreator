@@ -7,6 +7,8 @@ import {
   ConnectPlatformResponse,
   MockConnectRequest,
   MockConnectResponse,
+  SimpleConnectRequest,
+  SimpleConnectResponse,
   SocialAccount,
   SocialAccountsResponse,
 } from '../models/social-account.model';
@@ -30,13 +32,52 @@ export class SocialAccountService {
     return this.api
       .get<SocialAccountsResponse>('social-accounts')
       .pipe(
-        map((res) => res.data),
+        map((res) => {
+          const list = res?.data ?? [];
+          return list.map((acc) => ({
+            ...acc,
+            is_active: acc.is_active ?? (acc.status ? acc.status === 'connected' : true),
+            status: acc.status ?? (acc.is_active === false ? 'expired' : 'connected'),
+          }));
+        }),
         tap({
           next: (data) => {
             this.accounts.set(data);
             this.isLoading.set(false);
           },
           error: () => this.isLoading.set(false),
+        })
+      );
+  }
+
+  /**
+   * Unified agile connect endpoint for social accounts.
+   * POST /api/social-accounts/connect
+   */
+  connectSimple(payload: SimpleConnectRequest): Observable<SimpleConnectResponse> {
+    return this.api
+      .post<SimpleConnectResponse>('social-accounts/connect', payload)
+      .pipe(
+        tap((res) => {
+          if (res?.connected?.length) {
+            this.accounts.update((current) => {
+              const updated = [...current];
+              for (const acc of res.connected) {
+                const mappedAcc: SocialAccount = {
+                  ...acc,
+                  is_active: acc.is_active ?? (acc.status ? acc.status === 'connected' : true),
+                  status: acc.status ?? (acc.is_active === false ? 'expired' : 'connected'),
+                };
+                const idx = updated.findIndex((a) => a.platform === mappedAcc.platform);
+                if (idx >= 0) {
+                  updated[idx] = mappedAcc;
+                } else {
+                  updated.push(mappedAcc);
+                }
+              }
+              return updated;
+            });
+          }
         })
       );
   }
@@ -58,7 +99,12 @@ export class SocialAccountService {
       .post<MockConnectResponse>('social-accounts/mock-connect', payload)
       .pipe(
         tap((newAcc) => {
-          this.accounts.update((current) => [...current, newAcc as SocialAccount]);
+          const mappedAcc: SocialAccount = {
+            ...newAcc,
+            is_active: true,
+            status: 'connected',
+          };
+          this.accounts.update((current) => [...current, mappedAcc]);
         })
       );
   }

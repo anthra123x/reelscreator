@@ -66,6 +66,74 @@ describe('VideoService', () => {
     expect(apiMock.get).toHaveBeenCalledWith('videos/uuid-1/status');
   });
 
+  it('should submit video with auto_publish options', async () => {
+    const request: VideoIngestRequest = {
+      source_url: 'https://example.com/video.mp4',
+      strategy: 'fixed_interval',
+      auto_publish: true,
+      platforms: ['tiktok', 'instagram', 'youtube'],
+      caption: 'Auto reel',
+    };
+    const response: VideoIngestResponse = {
+      id: 'uuid-1',
+      source_url: 'https://example.com/video.mp4',
+      title: 'Sample',
+      status: 'pending',
+      created_at: new Date().toISOString(),
+    };
+
+    apiMock.post.mockReturnValue(of(response));
+
+    const res = await firstValueFrom(service.submitVideo(request));
+    expect(res.id).toBe('uuid-1');
+    expect(apiMock.post).toHaveBeenCalledWith('videos', request);
+  });
+
+  it('should call decomposeVideo on POST /videos/{id}/decompose', async () => {
+    const mockDecomposeRes = {
+      message: 'Video decomposed and reels dispatched for publication',
+      video: { id: 'uuid-1', status: 'ready' as const, source_url: 'http://test.com', title: 'T', created_at: '' },
+      clips: [],
+      publications: [],
+      published_platforms: ['tiktok'],
+      status: 'ready',
+    };
+
+    apiMock.post.mockReturnValue(of(mockDecomposeRes));
+
+    const res = await firstValueFrom(
+      service.decomposeVideo('uuid-1', { auto_publish: true, platforms: ['tiktok'] })
+    );
+
+    expect(apiMock.post).toHaveBeenCalledWith('videos/uuid-1/decompose', {
+      auto_publish: true,
+      platforms: ['tiktok'],
+    });
+    expect(res.status).toBe('ready');
+  });
+
+  it('should call ingestAndDecompose on POST /videos/decompose', async () => {
+    const payload = {
+      source_url: 'https://example.com/video.mp4',
+      auto_publish: true,
+      platforms: ['youtube'],
+    };
+    const mockRes = {
+      message: 'Video decomposed and reels dispatched for publication',
+      video: { id: 'uuid-2', status: 'ready' as const, source_url: 'http://test.com', title: 'T', created_at: '' },
+      clips: [],
+      publications: [],
+      published_platforms: ['youtube'],
+      status: 'ready',
+    };
+
+    apiMock.post.mockReturnValue(of(mockRes));
+
+    const res = await firstValueFrom(service.ingestAndDecompose(payload));
+    expect(apiMock.post).toHaveBeenCalledWith('videos/decompose', payload);
+    expect(res.status).toBe('ready');
+  });
+
   it('should delete video by id', async () => {
     apiMock.delete.mockReturnValue(of(undefined));
 

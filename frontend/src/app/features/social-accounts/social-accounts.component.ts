@@ -29,6 +29,20 @@ interface PlatformMeta {
             Administra los destinos de publicación para la distribución automatizada de reels en formato vertical 9:16.
           </p>
         </div>
+
+        <div class="header-actions">
+          <button
+            type="button"
+            class="btn btn-primary btn-quick-connect-all"
+            (click)="onQuickConnectAll()"
+            [disabled]="isConnectingAll()"
+          >
+            <svg viewBox="0 0 24 24" class="svg-icon-sm" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+            <span>{{ isConnectingAll() ? 'Vinculando Cuentas...' : 'Vincular Todas las Cuentas (Quick Connect)' }}</span>
+          </button>
+        </div>
       </div>
 
       <!-- Developer / Offline Mock Connection Panel -->
@@ -136,6 +150,15 @@ interface PlatformMeta {
                 <span class="detail-val username">@{{ acc.platform_username }}</span>
               </div>
               <div class="detail-row">
+                <span class="detail-label">Estado:</span>
+                <span class="detail-val tag" [ngClass]="acc.status === 'connected' ? 'status-connected' : 'status-expired'">
+                  ● {{ acc.status || 'connected' }}
+                </span>
+                <span class="detail-val tag" [ngClass]="acc.is_active !== false ? 'active-tag' : 'inactive-tag'">
+                  {{ acc.is_active !== false ? 'Activo' : 'Inactivo' }}
+                </span>
+              </div>
+              <div class="detail-row">
                 <span class="detail-label">Connected:</span>
                 <span class="detail-val">{{ acc.connected_at | relativeTime }}</span>
               </div>
@@ -164,6 +187,17 @@ interface PlatformMeta {
                 <div class="action-row">
                   <button
                     type="button"
+                    class="btn btn-primary btn-sm btn-quick-mock"
+                    (click)="onQuickConnectPlatform(p.key)"
+                    [disabled]="connectingPlatform() === p.key"
+                  >
+                    <svg viewBox="0 0 24 24" class="svg-icon-xs" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                    <span>{{ connectingPlatform() === p.key ? 'Conectando...' : 'Conexión Rápida (Mock)' }}</span>
+                  </button>
+                  <button
+                    type="button"
                     class="btn btn-secondary btn-sm"
                     (click)="connectOAuth(p.key)"
                   >
@@ -186,8 +220,57 @@ interface PlatformMeta {
 
     .page-header {
       display: flex;
-      flex-direction: column;
-      gap: 4px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .btn-quick-connect-all {
+      font-size: 13px;
+      padding: 8px 16px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      border: 1px solid #7c3aed;
+      color: #fff;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+    }
+
+    .btn-quick-connect-all:hover {
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    }
+
+    .btn-quick-mock {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      margin-right: 8px;
+    }
+
+    .status-connected {
+      background: rgba(34, 197, 94, 0.15);
+      color: #4ade80;
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+
+    .status-expired {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .active-tag {
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .inactive-tag {
+      background: rgba(113, 113, 122, 0.2);
+      color: #a1a1aa;
+      border: 1px solid #3f3f46;
     }
 
     .page-title {
@@ -451,6 +534,8 @@ export class SocialAccountsComponent implements OnInit {
   readonly accounts = signal<SocialAccount[]>([]);
   readonly isLoading = signal<boolean>(true);
   readonly isSubmittingMock = signal<boolean>(false);
+  readonly isConnectingAll = signal<boolean>(false);
+  readonly connectingPlatform = signal<string | null>(null);
   readonly isDisconnecting = signal<boolean>(false);
   readonly mockSuccessMessage = signal<string | null>(null);
 
@@ -500,6 +585,49 @@ export class SocialAccountsComponent implements OnInit {
 
   getAccount(platform: SocialPlatform): SocialAccount | undefined {
     return this.accounts().find((a) => a.platform === platform);
+  }
+
+  onQuickConnectAll(): void {
+    this.isConnectingAll.set(true);
+    this.mockSuccessMessage.set(null);
+
+    this.socialService
+      .connectSimple({ platform: 'all', mode: 'auto' })
+      .subscribe({
+        next: (res) => {
+          this.isConnectingAll.set(false);
+          const count = res.connected?.length || 3;
+          this.mockSuccessMessage.set(
+            `Todas las cuentas (${count}) conectadas exitosamente con adaptador ágil.`
+          );
+          this.loadAccounts();
+          setTimeout(() => this.mockSuccessMessage.set(null), 5000);
+        },
+        error: () => {
+          this.isConnectingAll.set(false);
+        },
+      });
+  }
+
+  onQuickConnectPlatform(platform: SocialPlatform): void {
+    this.connectingPlatform.set(platform);
+    this.mockSuccessMessage.set(null);
+
+    this.socialService
+      .connectSimple({ platform, mode: 'auto' })
+      .subscribe({
+        next: () => {
+          this.connectingPlatform.set(null);
+          this.mockSuccessMessage.set(
+            `Cuenta ${platform.toUpperCase()} vinculada exitosamente.`
+          );
+          this.loadAccounts();
+          setTimeout(() => this.mockSuccessMessage.set(null), 4000);
+        },
+        error: () => {
+          this.connectingPlatform.set(null);
+        },
+      });
   }
 
   onMockConnect(): void {

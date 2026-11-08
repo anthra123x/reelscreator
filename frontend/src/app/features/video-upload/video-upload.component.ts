@@ -6,11 +6,13 @@ import {
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
-import { RouterModule } from '@angular/router';
+import { ActivatedRoute, RouterModule } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { VideoService } from '../../core/services/video.service';
+import { PublishService } from '../../core/services/publish.service';
 import { CuttingStrategy, VerticalMode, VideoStatus } from '../../core/models/common.model';
 import { VideoIngestRequest } from '../../core/models/video.model';
+import { Publication } from '../../core/models/publication.model';
 import { StatusPillComponent } from '../../shared/components/status-pill/status-pill.component';
 
 @Component({
@@ -124,6 +126,53 @@ import { StatusPillComponent } from '../../shared/components/status-pill/status-
               </div>
             </div>
 
+            <!-- Autonomous Auto-Publishing Section -->
+            <div class="auto-publish-container">
+              <div class="checkbox-row">
+                <label class="custom-checkbox-label">
+                  <input
+                    type="checkbox"
+                    class="custom-checkbox"
+                    formControlName="auto_publish"
+                  />
+                  <span class="checkbox-text">
+                    <strong>Auto-publicar reels generados en cuentas vinculadas (TikTok, Instagram, YouTube)</strong>
+                    <span class="checkbox-desc">Despacha automáticamente los clips 9:16 al finalizar la transcodificación sin pasos manuales.</span>
+                  </span>
+                </label>
+              </div>
+
+              <!-- Multi-Platform Destination Selector & Caption -->
+              <div *ngIf="uploadForm.get('auto_publish')?.value" class="platform-selector-box">
+                <span class="selector-title">Plataformas de destino:</span>
+                <div class="platform-checkboxes">
+                  <label class="platform-pill-toggle" [class.selected]="uploadForm.get('publish_tiktok')?.value">
+                    <input type="checkbox" formControlName="publish_tiktok" />
+                    <span>TikTok</span>
+                  </label>
+                  <label class="platform-pill-toggle" [class.selected]="uploadForm.get('publish_instagram')?.value">
+                    <input type="checkbox" formControlName="publish_instagram" />
+                    <span>Instagram</span>
+                  </label>
+                  <label class="platform-pill-toggle" [class.selected]="uploadForm.get('publish_youtube')?.value">
+                    <input type="checkbox" formControlName="publish_youtube" />
+                    <span>YouTube</span>
+                  </label>
+                </div>
+
+                <div class="form-group caption-field">
+                  <label class="form-label" for="caption">Texto / Caption para Redes (Opcional)</label>
+                  <input
+                    id="caption"
+                    type="text"
+                    class="form-input"
+                    placeholder="ej. ¡Nuevo reel 9:16 generado con ReelForge! #shorts #reels"
+                    formControlName="caption"
+                  />
+                </div>
+              </div>
+            </div>
+
             <div class="form-actions">
               <button
                 type="submit"
@@ -219,13 +268,57 @@ import { StatusPillComponent } from '../../shared/components/status-pill/status-
                 <span class="success-title">Video Processing Complete!</span>
                 <span class="success-sub">9:16 vertical clips are ready for preview and publishing.</span>
               </div>
-              <a
-                [routerLink]="['/clips']"
-                [queryParams]="{ videoId: activeJobId() }"
-                class="btn btn-primary btn-view-clips"
-              >
-                View Generated Clips →
-              </a>
+
+              <!-- Auto-Publish Dispatch Summary Feedback -->
+              <div *ngIf="autoPublishRequested()" class="dispatch-summary-box">
+                <div class="dispatch-header">
+                  <svg viewBox="0 0 24 24" class="svg-icon-sm" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                  </svg>
+                  <span class="dispatch-title">Despacho Autónomo a Redes Sociales</span>
+                </div>
+
+                <div *ngIf="isLoadingPublications()" class="dispatch-loading">
+                  <span>Sincronizando estado de publicaciones automáticas...</span>
+                </div>
+
+                <div *ngIf="!isLoadingPublications() && publications().length > 0" class="dispatch-records">
+                  <div *ngFor="let pub of publications()" class="dispatch-record-item">
+                    <div class="record-platform">
+                      <span class="platform-badge" [ngClass]="pub.platform || pub.social_account?.platform || ''">
+                        {{ (pub.platform || pub.social_account?.platform || 'Red') | uppercase }}
+                      </span>
+                      <span class="record-id">ID: {{ pub.id | slice:0:8 }}...</span>
+                    </div>
+                    <div class="record-status">
+                      <span class="pub-status-badge" [ngClass]="pub.status || 'pending'">
+                        ● {{ pub.status || 'queued' }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div *ngIf="!isLoadingPublications() && publications().length === 0" class="dispatch-empty">
+                  <span>Reels generados. Despacho autónomo activado para las cuentas vinculadas.</span>
+                </div>
+              </div>
+
+              <div class="success-actions">
+                <a
+                  [routerLink]="['/clips']"
+                  [queryParams]="{ videoId: activeJobId() }"
+                  class="btn btn-primary btn-view-clips"
+                >
+                  View Generated Clips →
+                </a>
+                <a
+                  *ngIf="autoPublishRequested()"
+                  routerLink="/publish"
+                  class="btn btn-secondary btn-view-pub"
+                >
+                  Ver Publicaciones →
+                </a>
+              </div>
             </div>
 
             <!-- Failure Box -->
@@ -509,11 +602,170 @@ import { StatusPillComponent } from '../../shared/components/status-pill/status-
       font-size: 12px;
       color: var(--text-muted, #94a3b8);
     }
+
+    .auto-publish-container {
+      margin-top: 4px;
+      padding: 14px;
+      background: var(--bg-surface-elevated, #18181b);
+      border: 1px solid var(--border-subtle, #27272a);
+      border-radius: var(--radius-sm, 6px);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .custom-checkbox-label {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      cursor: pointer;
+    }
+    .custom-checkbox {
+      margin-top: 3px;
+      accent-color: #6366f1;
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+    .checkbox-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 13px;
+      color: #fff;
+    }
+    .checkbox-desc {
+      font-size: 11px;
+      color: var(--text-muted, #94a3b8);
+    }
+    .platform-selector-box {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-top: 8px;
+      border-top: 1px solid #27272a;
+    }
+    .selector-title {
+      font-size: 12px;
+      font-weight: 500;
+      color: #fff;
+    }
+    .platform-checkboxes {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .platform-pill-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: 9999px;
+      border: 1px solid #3f3f46;
+      background: #121214;
+      font-size: 12px;
+      color: #a1a1aa;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .platform-pill-toggle.selected {
+      border-color: #6366f1;
+      background: rgba(99, 102, 241, 0.15);
+      color: #fff;
+    }
+    .platform-pill-toggle input[type="checkbox"] {
+      display: none;
+    }
+    .caption-field {
+      margin-top: 4px;
+    }
+    .dispatch-summary-box {
+      margin-top: 14px;
+      padding: 12px;
+      background: #121214;
+      border: 1px solid #27272a;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      text-align: left;
+    }
+    .dispatch-header {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #c084fc;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .dispatch-records {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .dispatch-record-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    .record-platform {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .platform-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+      background: #27272a;
+      color: #fff;
+    }
+    .platform-badge.tiktok { background: rgba(0, 0, 0, 0.6); border: 1px solid #00f2fe; }
+    .platform-badge.instagram { background: rgba(225, 48, 108, 0.2); border: 1px solid #e1306c; color: #f472b6; }
+    .platform-badge.youtube { background: rgba(239, 68, 68, 0.2); border: 1px solid #ef4444; color: #f87171; }
+    .record-id {
+      font-size: 11px;
+      color: #71717a;
+      font-family: monospace;
+    }
+    .pub-status-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-weight: 500;
+      background: #27272a;
+      color: #a1a1aa;
+    }
+    .pub-status-badge.published { background: rgba(34, 197, 94, 0.15); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+    .pub-status-badge.queued, .pub-status-badge.pending, .pub-status-badge.scheduled { background: rgba(234, 179, 8, 0.15); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.3); }
+    .dispatch-loading, .dispatch-empty {
+      font-size: 12px;
+      color: #a1a1aa;
+      font-style: italic;
+    }
+    .success-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .btn-view-pub {
+      font-size: 13px;
+      padding: 8px 18px;
+    }
   `],
 })
 export class VideoUploadComponent implements OnInit, OnDestroy {
   private readonly fb = inject(FormBuilder);
   private readonly videoService = inject(VideoService);
+  private readonly publishService = inject(PublishService);
+  private readonly route = inject(ActivatedRoute);
 
   uploadForm!: FormGroup;
 
@@ -524,6 +776,9 @@ export class VideoUploadComponent implements OnInit, OnDestroy {
   readonly progressPercent = signal<number>(0);
   readonly jobErrorMessage = signal<string | null>(null);
   readonly submissionError = signal<string | null>(null);
+  readonly autoPublishRequested = signal<boolean>(false);
+  readonly publications = signal<Publication[]>([]);
+  readonly isLoadingPublications = signal<boolean>(false);
 
   private pollSubscription?: Subscription;
 
@@ -541,7 +796,18 @@ export class VideoUploadComponent implements OnInit, OnDestroy {
       vertical_mode: ['blur_padding', Validators.required],
       interval_seconds: [30, [Validators.min(5), Validators.max(600)]],
       max_duration_seconds: [60, [Validators.min(5), Validators.max(600)]],
+      auto_publish: [false],
+      publish_tiktok: [true],
+      publish_instagram: [true],
+      publish_youtube: [true],
+      caption: [''],
     });
+
+    const autoParam = this.route.snapshot?.queryParamMap?.get('auto_publish');
+    const modeParam = this.route.snapshot?.queryParamMap?.get('mode');
+    if (autoParam === 'true' || modeParam === 'autonomous') {
+      this.uploadForm.patchValue({ auto_publish: true });
+    }
   }
 
   ngOnDestroy(): void {
@@ -562,8 +828,20 @@ export class VideoUploadComponent implements OnInit, OnDestroy {
     this.submissionError.set(null);
     this.activeJobId.set(null);
     this.progressPercent.set(0);
+    this.publications.set([]);
 
     const formVal = this.uploadForm.getRawValue();
+    const autoPublish = Boolean(formVal.auto_publish);
+    this.autoPublishRequested.set(autoPublish);
+
+    const platforms: string[] = [];
+    if (formVal.publish_tiktok) platforms.push('tiktok');
+    if (formVal.publish_instagram) platforms.push('instagram');
+    if (formVal.publish_youtube) platforms.push('youtube');
+    if (platforms.length === 0) {
+      platforms.push('tiktok', 'instagram', 'youtube');
+    }
+
     const payload: VideoIngestRequest = {
       source_url: formVal.source_url,
       title: formVal.title || null,
@@ -571,6 +849,9 @@ export class VideoUploadComponent implements OnInit, OnDestroy {
       vertical_mode: formVal.vertical_mode as VerticalMode,
       interval_seconds: Number(formVal.interval_seconds),
       max_duration_seconds: Number(formVal.max_duration_seconds),
+      auto_publish: autoPublish,
+      platforms: autoPublish ? platforms : undefined,
+      caption: autoPublish && formVal.caption ? formVal.caption : undefined,
     };
 
     this.videoService.submitVideo(payload).subscribe({
@@ -599,6 +880,9 @@ export class VideoUploadComponent implements OnInit, OnDestroy {
         if (statusRes.status === 'ready') {
           this.isProcessing.set(false);
           this.progressPercent.set(100);
+          if (this.autoPublishRequested()) {
+            this.loadPublicationStatus(id);
+          }
         } else if (statusRes.status === 'failed') {
           this.isProcessing.set(false);
           this.jobErrorMessage.set(statusRes.error_message || 'Transcoding failed');
@@ -607,6 +891,20 @@ export class VideoUploadComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.isProcessing.set(false);
         this.jobErrorMessage.set(err.message || 'Error checking video status');
+      },
+    });
+  }
+
+  loadPublicationStatus(videoId: string): void {
+    this.isLoadingPublications.set(true);
+    this.publishService.getPublications({ per_page: 20 }).subscribe({
+      next: (res) => {
+        const list = res?.data || [];
+        this.publications.set(list);
+        this.isLoadingPublications.set(false);
+      },
+      error: () => {
+        this.isLoadingPublications.set(false);
       },
     });
   }
@@ -642,6 +940,8 @@ export class VideoUploadComponent implements OnInit, OnDestroy {
     this.submissionError.set(null);
     this.jobErrorMessage.set(null);
     this.isProcessing.set(false);
+    this.autoPublishRequested.set(false);
+    this.publications.set([]);
     this.uploadForm.reset({
       source_url: '',
       title: '',
@@ -649,6 +949,11 @@ export class VideoUploadComponent implements OnInit, OnDestroy {
       vertical_mode: 'blur_padding',
       interval_seconds: 30,
       max_duration_seconds: 60,
+      auto_publish: false,
+      publish_tiktok: true,
+      publish_instagram: true,
+      publish_youtube: true,
+      caption: '',
     });
   }
 }

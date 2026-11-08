@@ -1,52 +1,58 @@
 # Social Accounts Feature Module — Frontend ReelForge
 
 ## 1. Propósito y alcance
-El módulo de características Social Accounts administra la vinculación y supervisión de los canales sociales de destino para la distribución de clips en ReelForge. Su alcance incluye la visualización del estado de conexión para TikTok, Instagram Reels y YouTube Shorts, la gestión del ciclo de vida de los tokens de autenticación, el inicio del protocolo OAuth 2.0 y la provisión de un panel para el aprovisionamiento de cuentas simuladas (mock) para entornos de prueba sin credenciales reales de API.
+El módulo de características Social Accounts administra la vinculación, supervisión y aprovisionamiento simplificado de los canales sociales de destino (TikTok, Instagram Reels, YouTube Shorts) para la distribución desatendida de clips en ReelForge. Su alcance incluye la visualización detallada del estado de conexión y vigencia de tokens, la ejecución de vinculación ágil en un solo clic para todas las plataformas, acciones de conexión directa simulada por plataforma y el soporte de inicio de sesión OAuth estándar.
 
 ## 2. Contratos y API
 El módulo expone el componente standalone `SocialAccountsComponent`:
 - Ruta asociada: `/social-accounts`.
 - Contratos consumidos:
-  - `GET /api/social-accounts`: Listado de cuentas vinculadas (`{ data: SocialAccount[] }`).
-  - `POST /api/social-accounts/connect/{platform}`: Inicialización de flujo OAuth devolviendo `{ auth_url: string, state: string }`.
-  - `POST /api/social-accounts/mock-connect`: Vinculación instantánea de cuenta simulada (`platform`, `username`).
+  - `GET /api/social-accounts`: Listado de cuentas vinculadas (`{ data: SocialAccount[] }`) con propiedades `is_active` y `status`.
+  - `POST /api/social-accounts/connect`: Endpoint ágil unificado (`platform: 'all'|'tiktok'|'instagram'|'youtube'`, `mode: 'auto'|'mock'|'env'|'direct'`).
+  - `POST /api/social-accounts/connect/{platform}`: Inicialización de flujo OAuth interactivo (`{ auth_url: string, state: string }`).
+  - `POST /api/social-accounts/mock-connect`: Aprovisionamiento manual de cuenta simulada.
   - `DELETE /api/social-accounts/{id}`: Desconexión y eliminación de credenciales de canal.
 - Señales reactivas internas:
   - `accounts`: `WritableSignal<SocialAccount[]>` lista de cuentas activas.
   - `isLoading`: `WritableSignal<boolean>` estado de carga inicial.
-  - `isSubmittingMock`: `WritableSignal<boolean>` estado de envío de vinculación simulada.
+  - `isConnectingAll`: `WritableSignal<boolean>` estado de vinculación masiva en 1 clic.
+  - `connectingPlatform`: `WritableSignal<string | null>` plataforma individual en proceso de conexión rápida.
+  - `isSubmittingMock`: `WritableSignal<boolean>` estado de envío de vinculación simulada manual.
   - `isDisconnecting`: `WritableSignal<boolean>` estado de desconexión en proceso.
   - `mockSuccessMessage`: `WritableSignal<string | null>` mensaje de confirmación de vinculación.
 
 ## 3. Dependencias
-- `@angular/core`: Primitivas de componentes, inyección y señales.
-- `@angular/common`: Directivas comunes (`ngFor`, `ngIf`, `ngClass`).
-- `@angular/forms`: `FormsModule` para el formulario de conexión mock.
+- `@angular/core`: Primitivas de componentes, inyección y señales reactivas.
+- `@angular/common`: Directivas comunes (`ngFor`, `ngIf`, `ngClass`, `uppercase`).
+- `@angular/forms`: `FormsModule` para el formulario de conexión manual.
 - `frontend/src/app/core/services`: `SocialAccountService`.
 - `frontend/src/app/shared`: `RelativeTimePipe`.
 
 ## 4. Mapa de archivos
-- `social-accounts.component.ts`: Componente standalone integral con el panel de desarrollador para cuentas simuladas y las tarjetas de estado de TikTok, Instagram Reels y YouTube Shorts.
+- `social-accounts.component.ts`: Componente standalone integral con el botón de conexión ágil en 1 clic, panel de desarrollador para cuentas simuladas y tarjetas de estado con etiquetas de vigencia.
+- `social-accounts.component.spec.ts`: Suite de pruebas unitarias que valida la visualización de etiquetas `status` e `is_active`, el botón de vinculación en 1 clic y la conexión rápida directa por tarjeta.
 
 ## 5. Lógica y flujo
 1. Al montarse el componente, se invoca `loadAccounts()`, que consulta `GET /api/social-accounts` y almacena el resultado en la señal `accounts`.
 2. Las tarjetas de plataforma evalúan `getAccount(platformKey)` para determinar si el canal está enlazado.
-3. Si está enlazado, se muestra el nombre de usuario (`@handle`), la fecha relativa de vinculación y el tipo de canal (Adaptador Mock o OAuth Real), junto a un botón de desconexión.
-4. Si no está enlazado, se despliega una guía con los formatos y límites de la plataforma y un botón para iniciar la autorización OAuth.
-5. El panel superior permite crear cuentas simuladas al instante despachando `POST /api/social-accounts/mock-connect`, actualizando el estado reactivo sin recargar la página.
+3. Si está enlazado, se despliegan las etiquetas de estado (`status`, ej. `connected` o `expired`), el indicador de activación (`Activo` o `Inactivo`), el nombre de usuario (`@handle`), la fecha relativa de vinculación y el tipo de canal (Adaptador Mock o OAuth Real).
+4. Si no está enlazado, se ofrece tanto el botón estándar de autorización OAuth como un botón de acción directa "Conexión Rápida (Mock)" que despacha `POST /api/social-accounts/connect` para esa plataforma.
+5. El encabezado de la página incluye el botón principal "Vincular Todas las Cuentas (Quick Connect)", que enlaza las tres redes simultáneamente con `platform: 'all'`.
 
 ## 6. Decisiones de diseño y gotchas
-- Compatibilidad para entornos de prueba offline: La presencia del panel de desarrollador permite validar el flujo completo de publicación sin requerir llaves de API externas ni túneles de redirección OAuth.
-- Confirmación de desconexión: Las acciones de desvinculación exigen confirmación interactiva para evitar la pérdida accidental de canales vinculados.
-- Especificaciones de formato visibles: Cada tarjeta documenta los requerimientos técnicos de la red social correspondiente (por ejemplo, límite de 90 segundos para Instagram Reels vs 60 segundos para YouTube Shorts).
+- Reducción de fricción para pruebas y producción: El botón de 1 clic permite configurar el entorno completo de redes en una sola llamada sin tener que llenar formularios repetitivos para cada plataforma.
+- Soporte transparente para tokens mock y reales: La interfaz consume la misma respuesta estructurada devuelta por `OAuthController::simpleConnect`, adaptándose sin requerir bifurcaciones complejas en la vista.
+- Etiquetas de diagnóstico en tarjetas: La inclusión explícita de `is_active` y `status` permite identificar de inmediato si una cuenta vinculada tiene un token vencido o deshabilitado.
 
 ## 7. Estado y últimos cambios
-- Implementación de las tarjetas dedicadas para TikTok, Instagram Reels y YouTube Shorts.
-- Integración de panel de vinculación rápida mock para pruebas de integración.
-- Gestión de estado de desconexión con actualización inmediata del almacén reactivo.
+- Milestone M7: Incorporación del botón de 1 clic "Vincular Todas las Cuentas (Quick Connect)" en el encabezado.
+- Milestone M7: Adición del botón de acción directa "Conexión Rápida (Mock)" en cada tarjeta desconectada.
+- Milestone M7: Renderizado de etiquetas visuales de `status` y estado `is_active` en las tarjetas de cuentas vinculadas.
+- Milestone M7: Creación de la suite de pruebas unitarias `social-accounts.component.spec.ts`.
 
 ## 8. Cómo verificar
 ```bash
 cd frontend
 bun run build # Valida la ausencia de errores en la compilación de SocialAccountsComponent
+bun run test -- --watch=false # Ejecuta las pruebas unitarias del módulo Social Accounts
 ```

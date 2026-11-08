@@ -4,6 +4,9 @@ import { startWith, switchMap, take, takeWhile } from 'rxjs/operators';
 import { ApiService } from './api.service';
 import { PaginatedResponse } from '../models/common.model';
 import {
+  DecomposeVideoRequest,
+  DecomposeVideoResponse,
+  IngestAndDecomposeRequest,
   Video,
   VideoFilterParams,
   VideoIngestRequest,
@@ -27,6 +30,22 @@ export class VideoService {
    */
   submitVideo(payload: VideoIngestRequest): Observable<VideoIngestResponse> {
     return this.api.post<VideoIngestResponse>('videos', payload);
+  }
+
+  /**
+   * Decompose an existing video into 9:16 vertical reels and dispatch publications.
+   * POST /api/videos/{id}/decompose
+   */
+  decomposeVideo(id: string, payload?: DecomposeVideoRequest): Observable<DecomposeVideoResponse> {
+    return this.api.post<DecomposeVideoResponse>(`videos/${id}/decompose`, payload ?? {});
+  }
+
+  /**
+   * Ingest and decompose a video into 9:16 vertical reels in one autonomous call.
+   * POST /api/videos/decompose
+   */
+  ingestAndDecompose(payload: IngestAndDecomposeRequest): Observable<DecomposeVideoResponse> {
+    return this.api.post<DecomposeVideoResponse>('videos/decompose', payload);
   }
 
   /**

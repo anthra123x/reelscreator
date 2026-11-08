@@ -37,6 +37,41 @@ export interface VideoIngestRequest {
   max_duration_seconds?: number;
   vertical_mode?: VerticalMode;
   title?: string | null;
+  auto_publish?: boolean;
+  platforms?: string[];
+  caption?: string | null;
+}
+
+export interface DecomposeVideoRequest {
+  interval_seconds?: number;
+  max_duration?: number;
+  max_duration_seconds?: number;
+  vertical_mode?: VerticalMode;
+  auto_publish?: boolean;
+  platforms?: string[];
+  caption?: string | null;
+  video_duration?: number;
+  regenerate?: boolean;
+  [key: string]: unknown;
+}
+
+export interface IngestAndDecomposeRequest extends VideoIngestRequest {
+  video_duration?: number;
+}
+
+export interface DecomposeVideoResponse {
+  message: string;
+  video: Video;
+  clips: Clip[];
+  publications: Array<{
+    id: string;
+    clip_id?: string;
+    platform?: string;
+    status?: string;
+    [key: string]: unknown;
+  }>;
+  published_platforms: string[];
+  status: string;
 }
 
 export interface VideoIngestResponse {

@@ -8,6 +8,21 @@ export interface SocialAccount {
   connected_at: string;
   expires_at?: string | null;
   is_mock: boolean;
+  is_active?: boolean;
+  status?: string;
+}
+
+export interface SimpleConnectRequest {
+  platform: string;
+  mode?: string;
+  username?: string;
+  access_token?: string;
+}
+
+export interface SimpleConnectResponse {
+  message: string;
+  connected: SocialAccount[];
+  account?: SocialAccount;
 }
 
 export interface MockConnectRequest {

@@ -28,7 +28,7 @@ describe('SocialAccountService', () => {
     service = TestBed.inject(SocialAccountService);
   });
 
-  it('should list connected accounts and unwrap data array', async () => {
+  it('should list connected accounts, map is_active and status, and unwrap data array', async () => {
     const mockAccounts: SocialAccount[] = [
       {
         id: 'acc-1',
@@ -45,7 +45,50 @@ describe('SocialAccountService', () => {
     const accounts = await firstValueFrom(service.getAccounts());
     expect(accounts.length).toBe(1);
     expect(accounts[0].platform).toBe('tiktok');
-    expect(service.accounts()).toEqual(mockAccounts);
+    expect(accounts[0].is_active).toBe(true);
+    expect(accounts[0].status).toBe('connected');
+    expect(service.accounts()[0].is_active).toBe(true);
+    expect(service.accounts()[0].status).toBe('connected');
+  });
+
+  it('should call connectSimple via POST /social-accounts/connect and update signal accounts', async () => {
+    const simpleRes = {
+      message: 'Social accounts connected successfully',
+      connected: [
+        {
+          id: 'acc-tiktok',
+          platform: 'tiktok' as const,
+          platform_username: 'auto_tiktok',
+          is_mock: true,
+          status: 'connected',
+          is_active: true,
+          connected_at: new Date().toISOString(),
+        },
+        {
+          id: 'acc-ig',
+          platform: 'instagram' as const,
+          platform_username: 'auto_ig',
+          is_mock: true,
+          status: 'connected',
+          is_active: true,
+          connected_at: new Date().toISOString(),
+        },
+      ],
+    };
+
+    apiMock.post.mockReturnValue(of(simpleRes));
+
+    const result = await firstValueFrom(
+      service.connectSimple({ platform: 'all', mode: 'auto' })
+    );
+
+    expect(apiMock.post).toHaveBeenCalledWith('social-accounts/connect', {
+      platform: 'all',
+      mode: 'auto',
+    });
+    expect(result.connected.length).toBe(2);
+    expect(service.accounts().length).toBe(2);
+    expect(service.accounts().find((a) => a.platform === 'tiktok')?.is_active).toBe(true);
   });
 
   it('should provision mock account and update signal state', async () => {

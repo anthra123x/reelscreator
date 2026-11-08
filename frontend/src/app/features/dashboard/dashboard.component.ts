@@ -1,7 +1,7 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { forkJoin, of } from 'rxjs';
+import { Subscription, forkJoin, of, timer } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { VideoService } from '../../core/services/video.service';
 import { ClipService } from '../../core/services/clip.service';
@@ -18,6 +18,8 @@ export interface DashboardMetrics {
   totalClips: number;
   activeJobs: number;
   totalPublications: number;
+  connectedAccounts: number;
+  successfulPublications: number;
 }
 
 export interface PlatformStat {
@@ -51,14 +53,31 @@ export interface TopReel {
   ],
   template: `
     <div class="dashboard-page">
-      <!-- Header Row: Title & Action Bar -->
+      <!-- Header Row: Title, Polling Indicator & Action Bar -->
       <div class="dashboard-header">
-        <div>
-          <h1 class="page-title">Métricas de Rendimiento</h1>
+        <div class="header-left">
+          <div class="title-row">
+            <h1 class="page-title">Métricas de Rendimiento</h1>
+            <div class="polling-indicator-badge">
+              <span class="live-dot" [class.syncing]="isLoading()"></span>
+              <span class="polling-text">Sincronización en vivo (10s)</span>
+            </div>
+          </div>
           <p class="page-subtitle">Monitoreo en tiempo real de audiencia, clips generados y difusión social.</p>
         </div>
 
         <div class="header-actions">
+          <a
+            routerLink="/video-upload"
+            [queryParams]="{ auto_publish: 'true', mode: 'autonomous' }"
+            class="btn btn-secondary autonomous-quick-btn"
+          >
+            <svg viewBox="0 0 24 24" class="svg-icon-sm" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+            <span>Descomposición y Publicación Autónoma</span>
+          </a>
+
           <button
             type="button"
             class="btn btn-secondary refresh-btn"
@@ -92,78 +111,80 @@ export interface TopReel {
         </div>
       </div>
 
-      <!-- KPI Metrics Grid (Row 1: 4 Cards like Image 1) -->
+      <!-- KPI Metrics Grid (Row 1: 4 Cards) -->
       <div class="kpi-grid">
-        <!-- Metric 1: Total Views -->
+        <!-- Metric 1: Videos Procesados -->
         <div class="kpi-card">
           <div class="kpi-top">
-            <span class="kpi-label">Visualizaciones Totales</span>
+            <span class="kpi-label">Videos Procesados</span>
             <span class="kpi-trend positive">
               <svg viewBox="0 0 24 24" class="trend-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
                 <polyline points="17 6 23 6 23 12"></polyline>
               </svg>
-              +12.5%
+              Activo
             </span>
           </div>
           <div class="kpi-val" *ngIf="!isLoading(); else metricSkeleton">
-            {{ formattedTotalViews() }}
+            {{ metrics().totalVideos }}
           </div>
-          <span class="kpi-sub">Últimos 30 días en redes</span>
+          <span class="kpi-sub">Total de videos ingresados</span>
         </div>
 
-        <!-- Metric 2: Total Clips -->
+        <!-- Metric 2: Reels 9:16 Generados -->
         <div class="kpi-card">
           <div class="kpi-top">
-            <span class="kpi-label">Reels Generados</span>
+            <span class="kpi-label">Reels 9:16 Generados</span>
             <span class="kpi-trend positive">
               <svg viewBox="0 0 24 24" class="trend-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
                 <polyline points="17 6 23 6 23 12"></polyline>
               </svg>
-              +8.2%
+              9:16
             </span>
           </div>
           <div class="kpi-val" *ngIf="!isLoading(); else metricSkeleton">
-            {{ metrics().totalClips || 1240 }}
+            {{ metrics().totalClips }}
           </div>
           <span class="kpi-sub">Total clips 9:16 vertical</span>
         </div>
 
-        <!-- Metric 3: Active Reach / Followers -->
+        <!-- Metric 3: Cuentas Conectadas -->
         <div class="kpi-card">
           <div class="kpi-top">
-            <span class="kpi-label">Nuevos Seguidores</span>
+            <span class="kpi-label">Cuentas Conectadas</span>
             <span class="kpi-trend neutral">
               <svg viewBox="0 0 24 24" class="trend-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-                <polyline points="17 6 23 6 23 12"></polyline>
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
               </svg>
-              +4.3%
+              {{ metrics().connectedAccounts }}/3
             </span>
           </div>
           <div class="kpi-val" *ngIf="!isLoading(); else metricSkeleton">
-            3,420
+            {{ metrics().connectedAccounts }}
           </div>
-          <span class="kpi-sub">TikTok, Instagram y YouTube</span>
+          <span class="kpi-sub">TikTok, Instagram y YouTube activas</span>
         </div>
 
-        <!-- Metric 4: Average Retention -->
+        <!-- Metric 4: Publicaciones Realizadas -->
         <div class="kpi-card">
           <div class="kpi-top">
-            <span class="kpi-label">Retención Promedio</span>
+            <span class="kpi-label">Publicaciones Realizadas</span>
             <span class="kpi-trend positive">
               <svg viewBox="0 0 24 24" class="trend-icon" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
                 <polyline points="17 6 23 6 23 12"></polyline>
               </svg>
-              +2.1%
+              {{ metrics().successfulPublications }} exitosas
             </span>
           </div>
           <div class="kpi-val" *ngIf="!isLoading(); else metricSkeleton">
-            68.4 %
+            {{ metrics().totalPublications }}
           </div>
-          <span class="kpi-sub">Finalización de reproducción</span>
+          <span class="kpi-sub">Despachadas a redes sociales</span>
         </div>
       </div>
 
@@ -454,52 +475,61 @@ export interface TopReel {
       gap: 20px;
     }
 
-    .dashboard-header {
-      display: flex;
+    .dashboard-header { display: flex; align-items: center; justify-content: space-between; }
+    .header-left { display: flex; flex-direction: column; gap: 3px; }
+    .title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+    .polling-indicator-badge {
+      display: inline-flex;
       align-items: center;
-      justify-content: space-between;
+      gap: 6px;
+      padding: 3px 9px;
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.25);
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 500;
+      color: #4ade80;
     }
 
-    .page-title {
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      color: #ffffff;
+    .live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 6px rgba(34, 197, 94, 0.7);
+      animation: pulse-dot 2s infinite ease-in-out;
+    }
+    .live-dot.syncing { background: #eab308; box-shadow: 0 0 6px rgba(234, 179, 8, 0.7); }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.85); }
     }
 
-    .page-subtitle {
-      font-size: 13px;
-      color: var(--text-muted, #a1a1aa);
-      margin-top: 3px;
-    }
-
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .refresh-btn {
+    .autonomous-quick-btn {
       font-size: 12px;
       padding: 7px 12px;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(168, 85, 247, 0.15));
+      border: 1px solid rgba(139, 92, 246, 0.35);
+      color: #c084fc;
+      transition: all 0.2s ease;
+    }
+    .autonomous-quick-btn:hover {
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.25), rgba(168, 85, 247, 0.25));
+      border-color: rgba(168, 85, 247, 0.6);
+      color: #fff;
     }
 
-    .new-clip-btn {
-      font-size: 12px;
-      padding: 7px 14px;
-    }
+    .page-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: #fff; }
+    .page-subtitle { font-size: 13px; color: #a1a1aa; margin-top: 3px; }
+    .header-actions { display: flex; align-items: center; gap: 10px; }
+    .refresh-btn { font-size: 12px; padding: 7px 12px; }
+    .new-clip-btn { font-size: 12px; padding: 7px 14px; }
 
-    .svg-icon-sm {
-      width: 15px;
-      height: 15px;
-    }
+    .svg-icon-sm { width: 15px; height: 15px; }
+    .svg-icon-xs { width: 13px; height: 13px; }
 
-    .svg-icon-xs {
-      width: 13px;
-      height: 13px;
-    }
-
-    /* KPI Grid (Row 1) */
     .kpi-grid {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -507,26 +537,17 @@ export interface TopReel {
     }
 
     .kpi-card {
-      background-color: var(--bg-surface, #121214);
-      border: 1px solid var(--border-subtle, #27272a);
-      border-radius: var(--radius-md, 10px);
+      background: #121214;
+      border: 1px solid #27272a;
+      border-radius: 10px;
       padding: 18px 20px;
       display: flex;
       flex-direction: column;
       gap: 8px;
     }
 
-    .kpi-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .kpi-label {
-      font-size: 12px;
-      font-weight: 500;
-      color: var(--text-muted, #a1a1aa);
-    }
+    .kpi-top { display: flex; align-items: center; justify-content: space-between; }
+    .kpi-label { font-size: 12px; font-weight: 500; color: #a1a1aa; }
 
     .kpi-trend {
       display: inline-flex;
@@ -536,35 +557,24 @@ export interface TopReel {
       font-weight: 600;
       padding: 2px 7px;
       border-radius: 9999px;
-      background-color: var(--bg-surface-elevated, #18181b);
-      border: 1px solid var(--border-subtle, #27272a);
-      color: #ffffff;
+      background: #18181b;
+      border: 1px solid #27272a;
+      color: #fff;
     }
 
-    .trend-icon {
-      width: 12px;
-      height: 12px;
-    }
-
-    .trend-icon-sm {
-      width: 11px;
-      height: 11px;
-    }
+    .trend-icon { width: 12px; height: 12px; }
+    .trend-icon-sm { width: 11px; height: 11px; }
 
     .kpi-val {
       font-size: 26px;
       font-weight: 700;
-      color: #ffffff;
+      color: #fff;
       line-height: 1.1;
       letter-spacing: -0.02em;
     }
 
-    .kpi-sub {
-      font-size: 11px;
-      color: var(--text-faint, #71717a);
-    }
+    .kpi-sub { font-size: 11px; color: #71717a; }
 
-    /* Middle Grid (Row 2) */
     .dashboard-middle-grid {
       display: grid;
       grid-template-columns: 1fr 1.35fr;
@@ -572,120 +582,63 @@ export interface TopReel {
     }
 
     .dashboard-card {
-      background-color: var(--bg-surface, #121214);
-      border: 1px solid var(--border-subtle, #27272a);
-      border-radius: var(--radius-md, 10px);
+      background: #121214;
+      border: 1px solid #27272a;
+      border-radius: 10px;
       padding: 20px;
       display: flex;
       flex-direction: column;
       gap: 16px;
     }
 
-    .card-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .card-title {
-      font-size: 14px;
-      font-weight: 600;
-      color: #ffffff;
-    }
+    .card-header { display: flex; align-items: center; justify-content: space-between; }
+    .card-title { font-size: 14px; font-weight: 600; color: #fff; }
 
     .view-link {
       display: inline-flex;
       align-items: center;
       gap: 4px;
       font-size: 12px;
-      color: var(--text-muted, #a1a1aa);
+      color: #a1a1aa;
       transition: color 0.15s ease;
     }
+    .view-link:hover { color: #fff; }
 
-    .view-link:hover {
-      color: #ffffff;
-    }
-
-    /* Heatmap Styles */
     .heatmap-legend, .chart-legend {
       display: flex;
       align-items: center;
       gap: 12px;
       font-size: 11px;
-      color: var(--text-muted, #a1a1aa);
+      color: #a1a1aa;
     }
 
-    .legend-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-    }
+    .legend-item { display: inline-flex; align-items: center; gap: 5px; }
+    .legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+    .legend-dot.level-0 { background: #18181b; }
+    .legend-dot.level-1 { background: #3f3f46; }
+    .legend-dot.level-2 { background: #71717a; }
+    .legend-dot.level-3 { background: #fff; }
 
-    .legend-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 2px;
-    }
-
-    .legend-dot.level-0 { background-color: #18181b; }
-    .legend-dot.level-1 { background-color: #3f3f46; }
-    .legend-dot.level-2 { background-color: #71717a; }
-    .legend-dot.level-3 { background-color: #ffffff; }
-
-    .heatmap-container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 6px 0;
-    }
-
-    .heatmap-grid {
-      display: flex;
-      gap: 12px;
-      width: 100%;
-      max-width: 420px;
-    }
-
+    .heatmap-container { display: flex; flex-direction: column; align-items: center; padding: 6px 0; }
+    .heatmap-grid { display: flex; gap: 12px; width: 100%; max-width: 420px; }
     .heatmap-hours {
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       padding-bottom: 22px;
       font-size: 10px;
-      color: var(--text-faint, #71717a);
+      color: #71717a;
       line-height: 1;
     }
 
-    .heatmap-matrix {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .matrix-row {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 6px;
-    }
-
-    .matrix-cell {
-      aspect-ratio: 1;
-      border-radius: 4px;
-      background-color: #18181b;
-      transition: transform 0.15s ease, filter 0.15s ease;
-      cursor: pointer;
-    }
-
-    .matrix-cell:hover {
-      transform: scale(1.15);
-      filter: brightness(1.2);
-    }
-
-    .cell-level-0 { background-color: #18181b; }
-    .cell-level-1 { background-color: #2e2e33; }
-    .cell-level-2 { background-color: #52525b; }
-    .cell-level-3 { background-color: #ffffff; }
+    .heatmap-matrix { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+    .matrix-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+    .matrix-cell { aspect-ratio: 1; border-radius: 4px; background: #18181b; transition: transform 0.15s ease, filter 0.15s ease; cursor: pointer; }
+    .matrix-cell:hover { transform: scale(1.15); filter: brightness(1.2); }
+    .cell-level-0 { background: #18181b; }
+    .cell-level-1 { background: #2e2e33; }
+    .cell-level-2 { background: #52525b; }
+    .cell-level-3 { background: #fff; }
 
     .heatmap-days {
       display: grid;
@@ -693,56 +646,26 @@ export interface TopReel {
       gap: 6px;
       margin-top: 6px;
       font-size: 10px;
-      color: var(--text-faint, #71717a);
+      color: #71717a;
       text-align: center;
     }
 
-    /* Chart Styles */
-    .chart-line-indicator {
-      width: 14px;
-      height: 2px;
-      display: inline-block;
-    }
+    .chart-line-indicator { width: 14px; height: 2px; display: inline-block; }
+    .chart-line-indicator.real { background: #fff; }
+    .chart-line-indicator.target { background: #71717a; border-top: 1px dashed #71717a; }
 
-    .chart-line-indicator.real {
-      background-color: #ffffff;
-    }
-
-    .chart-line-indicator.target {
-      background-color: #71717a;
-      border-top: 1px dashed #71717a;
-    }
-
-    .chart-wrapper {
-      position: relative;
-      width: 100%;
-      height: 200px;
-    }
-
-    .performance-chart {
-      width: 100%;
-      height: 100%;
-      overflow: visible;
-    }
-
-    .chart-axis-text {
-      font-size: 10px;
-      fill: var(--text-faint, #71717a);
-      font-family: inherit;
-    }
-
-    .chart-axis-text.highlight {
-      fill: #ffffff;
-      font-weight: 600;
-    }
+    .chart-wrapper { position: relative; width: 100%; height: 200px; }
+    .performance-chart { width: 100%; height: 100%; overflow: visible; }
+    .chart-axis-text { font-size: 10px; fill: #71717a; font-family: inherit; }
+    .chart-axis-text.highlight { fill: #fff; font-weight: 600; }
 
     .chart-tooltip {
       position: absolute;
       top: 28px;
       right: 56px;
-      background-color: #09090b;
-      border: 1px solid var(--border-strong, #3f3f46);
-      border-radius: var(--radius-sm, 6px);
+      background: #09090b;
+      border: 1px solid #3f3f46;
+      border-radius: 6px;
       padding: 8px 12px;
       display: flex;
       flex-direction: column;
@@ -751,242 +674,99 @@ export interface TopReel {
       pointer-events: none;
     }
 
-    .tooltip-date {
-      font-size: 10px;
-      color: var(--text-muted, #a1a1aa);
-      margin-bottom: 2px;
-    }
+    .tooltip-date { font-size: 10px; color: #a1a1aa; margin-bottom: 2px; }
+    .tooltip-row { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+    .tooltip-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .tooltip-dot.white { background: #fff; }
+    .tooltip-dot.gray { background: #71717a; }
+    .tooltip-label { color: #a1a1aa; }
+    .tooltip-value { font-weight: 600; color: #fff; margin-left: auto; }
 
-    .tooltip-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 11px;
-    }
-
-    .tooltip-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-    }
-
-    .tooltip-dot.white { background-color: #ffffff; }
-    .tooltip-dot.gray { background-color: #71717a; }
-
-    .tooltip-label {
-      color: var(--text-muted, #a1a1aa);
-    }
-
-    .tooltip-value {
-      font-weight: 600;
-      color: #ffffff;
-      margin-left: auto;
-    }
-
-    /* Bottom Grid (Row 3) */
-    .dashboard-bottom-grid {
-      display: grid;
-      grid-template-columns: 1fr 1.6fr;
-      gap: 16px;
-    }
-
-    .platform-list {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-
+    .dashboard-bottom-grid { display: grid; grid-template-columns: 1fr 1.6fr; gap: 16px; }
+    .platform-list { display: flex; flex-direction: column; gap: 14px; }
     .platform-item {
       display: flex;
       flex-direction: column;
       gap: 8px;
       padding: 12px;
-      background-color: var(--bg-surface-elevated, #18181b);
-      border: 1px solid var(--border-subtle, #27272a);
-      border-radius: var(--radius-sm, 6px);
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 6px;
     }
-
-    .platform-meta {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-
+    .platform-meta { display: flex; align-items: center; gap: 12px; }
     .platform-icon {
       width: 28px;
       height: 28px;
       display: flex;
       align-items: center;
       justify-content: center;
-      background-color: #121214;
-      border: 1px solid var(--border-subtle, #27272a);
+      background: #121214;
+      border: 1px solid #27272a;
       border-radius: 6px;
-      color: #ffffff;
+      color: #fff;
       flex-shrink: 0;
     }
+    .platform-icon ::ng-deep svg { width: 16px; height: 16px; fill: currentColor; }
+    .platform-info { display: flex; flex-direction: column; flex: 1; }
+    .platform-name { font-size: 13px; font-weight: 600; color: #fff; }
+    .platform-handle { font-size: 11px; color: #71717a; }
+    .platform-metrics { display: flex; flex-direction: column; align-items: flex-end; }
+    .platform-views { font-size: 12px; font-weight: 600; color: #fff; }
+    .platform-growth { font-size: 10px; color: #a1a1aa; }
+    .platform-bar-track { width: 100%; height: 4px; background: #27272a; border-radius: 9999px; overflow: hidden; }
+    .platform-bar-fill { height: 100%; background: #fff; border-radius: 9999px; }
 
-    .platform-icon ::ng-deep svg {
-      width: 16px;
-      height: 16px;
-      fill: currentColor;
-    }
-
-    .platform-info {
-      display: flex;
-      flex-direction: column;
-      flex: 1;
-    }
-
-    .platform-name {
-      font-size: 13px;
-      font-weight: 600;
-      color: #ffffff;
-    }
-
-    .platform-handle {
-      font-size: 11px;
-      color: var(--text-faint, #71717a);
-    }
-
-    .platform-metrics {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-    }
-
-    .platform-views {
-      font-size: 12px;
-      font-weight: 600;
-      color: #ffffff;
-    }
-
-    .platform-growth {
-      font-size: 10px;
-      color: var(--text-muted, #a1a1aa);
-    }
-
-    .platform-bar-track {
-      width: 100%;
-      height: 4px;
-      background-color: #27272a;
-      border-radius: 9999px;
-      overflow: hidden;
-    }
-
-    .platform-bar-fill {
-      height: 100%;
-      background-color: #ffffff;
-      border-radius: 9999px;
-    }
-
-    /* Minimal Table Styles */
-    .table-responsive {
-      overflow-x: auto;
-    }
-
-    .minimal-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 12px;
-      text-align: left;
-    }
-
+    .table-responsive { overflow-x: auto; }
+    .minimal-table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
     .minimal-table th {
       padding: 10px 12px;
-      color: var(--text-faint, #71717a);
+      color: #71717a;
       font-weight: 500;
       font-size: 11px;
       letter-spacing: 0.05em;
-      border-bottom: 1px solid var(--border-subtle, #27272a);
+      border-bottom: 1px solid #27272a;
     }
-
     .minimal-table td {
       padding: 12px;
-      border-bottom: 1px solid var(--border-subtle, #27272a);
+      border-bottom: 1px solid #27272a;
       vertical-align: middle;
-      color: #ffffff;
+      color: #fff;
     }
-
-    .reel-cell {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      max-width: 220px;
-    }
-
-    .reel-title {
-      font-weight: 600;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      color: #ffffff;
-    }
-
-    .reel-id {
-      font-size: 10px;
-      color: var(--text-faint, #71717a);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
+    .reel-cell { display: flex; flex-direction: column; gap: 2px; max-width: 220px; }
+    .reel-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff; }
+    .reel-id { font-size: 10px; color: #71717a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .channel-badge {
       font-size: 10px;
       padding: 2px 7px;
       border-radius: 4px;
-      background-color: var(--bg-surface-elevated, #18181b);
-      border: 1px solid var(--border-subtle, #27272a);
-      color: var(--text-muted, #a1a1aa);
+      background: #18181b;
+      border: 1px solid #27272a;
+      color: #a1a1aa;
     }
-
-    .metric-mono {
-      font-family: monospace;
-      color: #ffffff;
-    }
-
-    .growth-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 2px;
-      font-size: 11px;
-      color: #ffffff;
-    }
-
+    .metric-mono { font-family: monospace; color: #fff; }
+    .growth-badge { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; color: #fff; }
     .status-ready-badge {
       font-size: 10px;
       padding: 2px 7px;
       border-radius: 9999px;
-      background-color: #ffffff;
+      background: #fff;
       color: #09090b;
       font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
-
     .clips-count {
       font-size: 11px;
       padding: 2px 6px;
-      background-color: var(--bg-surface-elevated, #18181b);
+      background: #18181b;
       border-radius: 4px;
-      color: #ffffff;
+      color: #fff;
     }
 
-    .btn-sm {
-      padding: 4px 10px;
-      font-size: 11px;
-    }
-
-    .text-right {
-      text-align: right;
-    }
-
-    .text-muted {
-      color: var(--text-muted, #a1a1aa);
-    }
-
-    .animate-spin {
-      animation: spin 1s linear infinite;
-    }
+    .btn-sm { padding: 4px 10px; font-size: 11px; }
+    .text-right { text-align: right; }
+    .text-muted { color: #a1a1aa; }
+    .animate-spin { animation: spin 1s linear infinite; }
 
     @keyframes spin {
       from { transform: rotate(0deg); }
@@ -1017,7 +797,7 @@ export interface TopReel {
     }
   `],
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
   private readonly videoService = inject(VideoService);
   private readonly clipService = inject(ClipService);
   private readonly socialService = inject(SocialAccountService);
@@ -1030,7 +810,11 @@ export class DashboardComponent implements OnInit {
     totalClips: 0,
     activeJobs: 0,
     totalPublications: 0,
+    connectedAccounts: 0,
+    successfulPublications: 0,
   });
+
+  private pollSubscription?: Subscription;
 
   readonly formattedTotalViews = computed<string>(() => {
     const clipsCount = this.metrics().totalClips;
@@ -1123,6 +907,25 @@ export class DashboardComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadDashboardData();
+    this.startAutoRefresh();
+  }
+
+  ngOnDestroy(): void {
+    this.stopAutoRefresh();
+  }
+
+  startAutoRefresh(): void {
+    this.stopAutoRefresh();
+    this.pollSubscription = timer(10000, 10000).subscribe(() => {
+      this.loadDashboardData();
+    });
+  }
+
+  stopAutoRefresh(): void {
+    if (this.pollSubscription) {
+      this.pollSubscription.unsubscribe();
+      this.pollSubscription = undefined;
+    }
   }
 
   getHeatmapTooltip(row: number, col: number, level: number): string {
@@ -1139,31 +942,50 @@ export class DashboardComponent implements OnInit {
       videos: this.videoService.getVideos({ per_page: 5 }).pipe(
         catchError(() => of({ data: [], total: 0 }))
       ),
-      publications: this.publishService.getPublications({ per_page: 1 }).pipe(
+      clips: this.clipService.getAllClips({ per_page: 1 }).pipe(
+        catchError(() => of({ data: [], total: 0 }))
+      ),
+      accounts: this.socialService.getAccounts().pipe(
+        catchError(() => of([]))
+      ),
+      publications: this.publishService.getPublications({ per_page: 20 }).pipe(
         catchError(() => of({ data: [], total: 0 }))
       ),
     }).subscribe({
-      next: ({ videos, publications }) => {
+      next: ({ videos, clips, accounts, publications }) => {
         const videoList = videos.data || [];
         this.recentVideos.set(videoList);
 
         let activeCount = 0;
-        let totalClipsCount = 0;
+        let videoClipsCount = 0;
 
         for (const v of videoList) {
           if (v.status === 'downloading' || v.status === 'processing' || v.status === 'pending') {
             activeCount++;
           }
           if (v.clips) {
-            totalClipsCount += v.clips.length;
+            videoClipsCount += v.clips.length;
           }
         }
 
+        const activeAccountsCount = (accounts || []).filter(
+          (acc) => acc.is_active !== false && acc.status !== 'expired'
+        ).length;
+
+        const totalClips = typeof clips.total === 'number' ? clips.total : videoClipsCount;
+
+        const pubList = publications.data || [];
+        const successPubs = pubList.filter(
+          (p) => p.status === 'published' || p.status === 'publishing' || p.status === 'scheduled'
+        ).length;
+
         this.metrics.set({
           totalVideos: videos.total || videoList.length,
-          totalClips: totalClipsCount || 1240,
+          totalClips: totalClips,
           activeJobs: activeCount,
-          totalPublications: publications.total || 0,
+          totalPublications: publications.total || pubList.length,
+          connectedAccounts: activeAccountsCount,
+          successfulPublications: successPubs,
         });
 
         this.isLoading.set(false);

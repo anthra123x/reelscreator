@@ -2,6 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { ApiService } from './api.service';
+import { PaginatedResponse, PaginationParams } from '../models/common.model';
 import { Clip, ClipListResponse, UpdateClipRequest } from '../models/clip.model';
 
 @Injectable({
@@ -13,6 +14,14 @@ export class ClipService {
   // Reactive state signals for UI binding
   readonly clips = signal<Clip[]>([]);
   readonly selectedClip = signal<Clip | null>(null);
+
+  /**
+   * Retrieve all generated clips across all videos.
+   * GET /api/clips
+   */
+  getAllClips(params?: PaginationParams): Observable<PaginatedResponse<Clip>> {
+    return this.api.get<PaginatedResponse<Clip>>('clips', params as Record<string, string | number>);
+  }
 
   /**
    * Retrieve all generated clips for a given video ID.
