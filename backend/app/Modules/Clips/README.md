@@ -54,6 +54,7 @@ El modulo `Clips` administra los fragmentos de video cortos generados en proporc
 - **Estado**: Funcionalidad verificada e integrada con el pipeline autonomo de descomposicion 9:16.
 - **Cambios recientes**:
   - Incorporacion del accessor `embed_url` en `Clip.php` con resolucion segura para YouTube y Vimeo con marcas de tiempo `start` y `end`.
+  - Resolucion robusta en `getThumbnailUrlAttribute` con fallback automatico a miniaturas de YouTube CDN (`hqdefault.jpg`) para entornos serverless.
   - Soporte para fuentes de streaming multimedia directas con fragmentos `#t=start,end` en `file_url`.
   - Carga impaciente (`with('video')`) en `ClipStorageService::listByVideo` para resolucion eficiente de URLs.
   - Validacion y persistencia de geometria vertical 1080x1920 y proporcion 9:16 en metadatos de clips generados por descomposicion autonoma.

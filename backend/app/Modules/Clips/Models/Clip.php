@@ -81,15 +81,20 @@ class Clip extends Model
      */
     public function getThumbnailUrlAttribute(): ?string
     {
-        if (! $this->thumbnail_path) {
-            return null;
-        }
-
-        if (str_starts_with($this->thumbnail_path, 'http://') || str_starts_with($this->thumbnail_path, 'https://')) {
+        if ($this->thumbnail_path && (str_starts_with($this->thumbnail_path, 'http://') || str_starts_with($this->thumbnail_path, 'https://'))) {
             return $this->thumbnail_path;
         }
 
-        return Storage::url($this->thumbnail_path);
+        if ($this->thumbnail_path && ! empty($this->thumbnail_path)) {
+            return Storage::url($this->thumbnail_path);
+        }
+
+        $sourceUrl = $this->relationLoaded('video') ? $this->video?->source_url : null;
+        if ($sourceUrl && preg_match('/(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i', $sourceUrl, $matches)) {
+            return "https://img.youtube.com/vi/{$matches[1]}/hqdefault.jpg";
+        }
+
+        return null;
     }
 
     /**

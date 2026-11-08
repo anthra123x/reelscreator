@@ -163,9 +163,8 @@ export type SlicingMode = 'cover' | 'blur';
         <div class="video-wrapper" [ngClass]="'mode-' + cropMode()" (click)="togglePlay()">
           <!-- Ambient Blur Backdrop Layer (active in both modes for maximum depth) -->
           <div
-            *ngIf="poster || true"
             class="ambient-blur-backdrop"
-            [style.background-image]="poster ? 'url(' + poster + ')' : 'none'"
+            [style.background-image]="effectivePoster ? 'url(' + effectivePoster + ')' : 'none'"
           ></div>
 
           <!-- Embed Player Layer (YouTube / Vimeo without desktop chrome) -->
@@ -746,15 +745,13 @@ export type SlicingMode = 'cover' | 'blur';
 
     /* Mode: Cover (Center Crop 9:16) */
     .mode-cover .video-embed-iframe {
-      position: absolute;
-      width: 177.78vh;
-      min-width: 100%;
+      width: 316%;
       height: 100%;
-      aspect-ratio: 16 / 9;
+      min-height: 100%;
+      max-width: none;
+      flex-shrink: 0;
       border: none;
-      pointer-events: none; /* Disables desktop YouTube controls; tapping delegates to phone frame */
-      transform: scale(1.68);
-      transform-origin: center center;
+      pointer-events: auto;
     }
 
     /* Mode: Blur Padding (Sharp center + blurred ambient) */
@@ -764,9 +761,9 @@ export type SlicingMode = 'cover' | 'blur';
       aspect-ratio: 16 / 9;
       max-height: 100%;
       border: none;
-      pointer-events: none;
+      pointer-events: auto;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.9);
-      border-radius: 4px;
+      border-radius: 6px;
     }
 
     /* Play/Pause Overlay */
@@ -1360,6 +1357,20 @@ export class VerticalPlayerComponent implements OnInit, OnChanges, OnDestroy {
     if (this.videoRef && this.videoRef.nativeElement) {
       this.videoRef.nativeElement.pause();
     }
+  }
+
+  get effectivePoster(): string | null {
+    if (this.poster && !this.poster.startsWith('/storage/')) {
+      return this.poster;
+    }
+    const raw = this.sourceUrl || this.clip?.video?.source_url || '';
+    const m = raw.match(
+      /(?:youtube\.com\/(?:watch\?.*v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i
+    );
+    if (m) {
+      return `https://img.youtube.com/vi/${m[1]}/hqdefault.jpg`;
+    }
+    return this.poster || null;
   }
 
   get channelHandle(): string {
