@@ -162,3 +162,90 @@ class ContractValidator:
         else:
             if not result.get("error"):
                 raise ContractValidationError("Failed publication must contain 'error' message")
+
+    @staticmethod
+    def validate_video_decomposition_response(data: Dict[str, Any]) -> None:
+        """Validate POST /api/videos/{id}/decompose or POST /api/videos/decompose contract."""
+        if not isinstance(data, dict):
+            raise ContractValidationError("Decomposition response must be a JSON object")
+
+        if not data.get("message"):
+            raise ContractValidationError("Decomposition response missing 'message'")
+
+        video = data.get("video")
+        if not isinstance(video, dict):
+            raise ContractValidationError("Decomposition response missing 'video' object")
+        ContractValidator.validate_uuid(video.get("id"), "video.id")
+
+        clips = data.get("clips")
+        if not isinstance(clips, list) or len(clips) == 0:
+            raise ContractValidationError("Decomposition response must contain a non-empty 'clips' array")
+
+        for i, clip in enumerate(clips):
+            ContractValidator.validate_uuid(clip.get("id"), f"clips[{i}].id")
+            if "start_time" not in clip or "end_time" not in clip:
+                raise ContractValidationError(f"clips[{i}] must specify start_time and end_time")
+            if float(clip.get("duration", 0)) <= 0:
+                raise ContractValidationError(f"clips[{i}] duration must be positive")
+
+            meta = clip.get("metadata", {})
+            if meta.get("width") != 1080 or meta.get("height") != 1920:
+                raise ContractValidationError(
+                    f"clips[{i}].metadata must specify 1080x1920, got {meta.get('width')}x{meta.get('height')}"
+                )
+            if meta.get("aspect_ratio") != "9:16":
+                raise ContractValidationError(
+                    f"clips[{i}].metadata must specify aspect_ratio '9:16', got '{meta.get('aspect_ratio')}'"
+                )
+
+        publications = data.get("publications", [])
+        if not isinstance(publications, list):
+            raise ContractValidationError("Field 'publications' must be a list")
+        for j, pub in enumerate(publications):
+            ContractValidator.validate_uuid(pub.get("id"), f"publications[{j}].id")
+            ContractValidator.validate_uuid(pub.get("clip_id"), f"publications[{j}].clip_id")
+            if pub.get("platform") not in ("tiktok", "instagram", "youtube"):
+                raise ContractValidationError(f"Invalid platform in publication: {pub.get('platform')}")
+
+    @staticmethod
+    def validate_social_accounts_connect_response(data: Dict[str, Any]) -> None:
+        """Validate POST /api/social-accounts/connect contract."""
+        if not isinstance(data, dict):
+            raise ContractValidationError("Connect response must be a JSON object")
+
+        if not data.get("message"):
+            raise ContractValidationError("Connect response missing 'message'")
+
+        connected = data.get("connected")
+        if not isinstance(connected, list) or len(connected) == 0:
+            raise ContractValidationError("Field 'connected' must be a non-empty list of connected accounts")
+
+        for i, acc in enumerate(connected):
+            ContractValidator.validate_uuid(acc.get("id"), f"connected[{i}].id")
+            if acc.get("platform") not in ("tiktok", "instagram", "youtube"):
+                raise ContractValidationError(f"connected[{i}] invalid platform '{acc.get('platform')}'")
+            if not acc.get("platform_username"):
+                raise ContractValidationError(f"connected[{i}] missing platform_username")
+            if not isinstance(acc.get("is_mock"), bool):
+                raise ContractValidationError(f"connected[{i}] 'is_mock' must be boolean")
+            if acc.get("status") != "connected":
+                raise ContractValidationError(f"connected[{i}] status must be 'connected'")
+
+    @staticmethod
+    def validate_dashboard_metrics_response(data: Dict[str, Any]) -> None:
+        """Validate aggregated dashboard metrics contract."""
+        if not isinstance(data, dict):
+            raise ContractValidationError("Dashboard metrics must be a JSON object")
+
+        for key in ["total_videos", "total_clips", "connected_accounts"]:
+            if key not in data or not isinstance(data[key], int) or data[key] < 0:
+                raise ContractValidationError(f"Dashboard metric '{key}' must be a non-negative integer")
+
+        pubs = data.get("publications")
+        if not isinstance(pubs, dict):
+            raise ContractValidationError("Dashboard metrics missing 'publications' object")
+
+        for pub_key in ["total", "published", "pending"]:
+            if pub_key not in pubs or not isinstance(pubs[pub_key], int) or pubs[pub_key] < 0:
+                raise ContractValidationError(f"Publication metric '{pub_key}' must be a non-negative integer")
+

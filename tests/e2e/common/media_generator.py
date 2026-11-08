@@ -155,3 +155,37 @@ class MediaGenerator:
             raise RuntimeError(f"FFmpeg vertical blur transcoding failed: {result.stderr}")
 
         return str(output)
+
+    @staticmethod
+    def transcode_with_filtergraph(
+        input_path: str,
+        output_path: str,
+        filtergraph: str,
+        start_time: float = 0.0,
+        duration: float = 5.0,
+    ) -> str:
+        """Transcode video using a custom FFmpeg filtergraph."""
+        output = Path(output_path)
+        output.parent.mkdir(parents=True, exist_ok=True)
+
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-threads", "1",
+            "-ss", str(start_time),
+            "-t", str(duration),
+            "-i", str(input_path),
+            "-vf", filtergraph,
+            "-c:v", "libx264",
+            "-preset", "ultrafast",
+            "-pix_fmt", "yuv420p",
+            "-c:a", "aac",
+            "-b:a", "128k",
+            str(output),
+        ]
+
+        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if result.returncode != 0:
+            raise RuntimeError(f"FFmpeg custom filtergraph transcoding failed: {result.stderr}")
+
+        return str(output)

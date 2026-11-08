@@ -5,6 +5,7 @@ Tests HTTP contracts for /health, POST /api/v1/jobs, GET /api/v1/jobs/:id, and c
 """
 
 import json
+import os
 import urllib.error
 import urllib.request
 import uuid
@@ -19,20 +20,22 @@ class TestRustAxumApiFeatures(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        # Probe if live Axum server is running on port 3000
-        cls.base_url = "http://127.0.0.1:3000"
+        mode = os.environ.get("REELFORGE_TEST_MODE", "auto")
         cls.mock_server = None
 
-        try:
-            req = urllib.request.Request(f"{cls.base_url}/health")
-            with urllib.request.urlopen(req, timeout=0.5) as resp:
-                if resp.status == 200:
-                    cls.is_live = True
-                    return
-        except Exception:
-            cls.is_live = False
+        if mode == "live":
+            cls.base_url = "http://127.0.0.1:3000"
+            try:
+                req = urllib.request.Request(f"{cls.base_url}/health")
+                with urllib.request.urlopen(req, timeout=0.5) as resp:
+                    if resp.status == 200:
+                        cls.is_live = True
+                        return
+            except Exception:
+                pass
 
-        # Launch ephemeral mock server implementing the Axum contract
+        # In auto or mock mode, launch ephemeral mock server for deterministic offline testing
+        cls.is_live = False
         cls.mock_server = EphemeralMockServer(port=3000)
         port = cls.mock_server.start()
         cls.base_url = f"http://127.0.0.1:{port}"

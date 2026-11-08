@@ -55,5 +55,13 @@ Thumbs.db
 # Agent workspaces & session artifacts
 .agents/
 rust_out
+.vercel/
+**/.vercel/
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
 
 

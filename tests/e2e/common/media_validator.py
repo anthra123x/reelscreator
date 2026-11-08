@@ -36,6 +36,44 @@ class MediaValidator:
         return json.loads(result.stdout)
 
     @staticmethod
+    def probe_video(file_path: str) -> Dict[str, Any]:
+        """Convenience method returning primary video and audio metadata."""
+        meta = MediaValidator.probe_media(file_path)
+        video_streams = [s for s in meta.get("streams", []) if s.get("codec_type") == "video"]
+        audio_streams = [s for s in meta.get("streams", []) if s.get("codec_type") == "audio"]
+
+        if not video_streams:
+            raise AssertionError(f"No video stream found in {file_path}")
+
+        v = video_streams[0]
+        w = int(v.get("width", 0))
+        h = int(v.get("height", 0))
+        aspect = "9:16" if (w == 1080 and h == 1920) or (w * 16 == h * 9) else f"{w}:{h}"
+
+        return {
+            "width": w,
+            "height": h,
+            "aspect_ratio": aspect,
+            "codec_name": v.get("codec_name", ""),
+            "audio_codec": audio_streams[0].get("codec_name", "") if audio_streams else None,
+            "duration": float(meta.get("format", {}).get("duration", 0.0)),
+        }
+
+    @staticmethod
+    def probe_image(file_path: str) -> Dict[str, Any]:
+        """Convenience method returning image dimensions and codec."""
+        meta = MediaValidator.probe_media(file_path)
+        video_streams = [s for s in meta.get("streams", []) if s.get("codec_type") == "video"]
+        if not video_streams:
+            raise AssertionError(f"No image stream found in {file_path}")
+        v = video_streams[0]
+        return {
+            "width": int(v.get("width", 0)),
+            "height": int(v.get("height", 0)),
+            "codec_name": v.get("codec_name", ""),
+        }
+
+    @staticmethod
     def assert_vertical_9_16(file_path: str, expected_width: int = 1080, expected_height: int = 1920) -> None:
         """Assert that media has vertical 9:16 aspect ratio with exact width and height."""
         meta = MediaValidator.probe_media(file_path)
