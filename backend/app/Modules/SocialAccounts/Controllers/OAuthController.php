@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
@@ -122,29 +123,48 @@ class OAuthController extends Controller
             return response()->json(['message' => "Unsupported platform: {$platform}"], 400);
         }
 
-        // Check if real developer credentials are set
-        $clientKey = match ($platform) {
+        $inputClientId = $request->input('client_id');
+        $inputClientSecret = $request->input('client_secret');
+
+        // Check if real developer credentials are set in config or request
+        $configKey = match ($platform) {
             SocialAccount::PLATFORM_TIKTOK => config('social.tiktok.client_key'),
             SocialAccount::PLATFORM_INSTAGRAM => config('social.instagram.client_id'),
             SocialAccount::PLATFORM_YOUTUBE => config('social.youtube.client_id'),
         };
 
-        $isConfigured = ! empty($clientKey) && ! str_starts_with((string) $clientKey, 'mock_');
+        $effectiveClientId = $inputClientId ?: $configKey;
+        $isConfigured = ! empty($effectiveClientId) && ! str_starts_with((string) $effectiveClientId, 'mock_');
 
         $state = Str::random(40);
         session(['oauth_state' => $state]);
 
+        if ($inputClientId && $inputClientSecret) {
+            Cache::put("oauth_creds_{$platform}_{$state}", [
+                'client_id' => $inputClientId,
+                'client_secret' => $inputClientSecret,
+            ], now()->addHour());
+        }
+
         $authUrl = match ($platform) {
-            SocialAccount::PLATFORM_TIKTOK => $this->tikTokOAuth->getAuthorizationUrl($state),
-            SocialAccount::PLATFORM_INSTAGRAM => $this->instagramOAuth->getAuthorizationUrl($state),
-            SocialAccount::PLATFORM_YOUTUBE => $this->youTubeOAuth->getAuthorizationUrl($state),
+            SocialAccount::PLATFORM_TIKTOK => $this->tikTokOAuth->getAuthorizationUrl($state, null, $effectiveClientId),
+            SocialAccount::PLATFORM_INSTAGRAM => $this->instagramOAuth->getAuthorizationUrl($state, $effectiveClientId),
+            SocialAccount::PLATFORM_YOUTUBE => $this->youTubeOAuth->getAuthorizationUrl($state, $effectiveClientId),
+        };
+
+        $redirectUri = match ($platform) {
+            SocialAccount::PLATFORM_TIKTOK => config('social.tiktok.redirect_uri'),
+            SocialAccount::PLATFORM_INSTAGRAM => config('social.instagram.redirect_uri'),
+            SocialAccount::PLATFORM_YOUTUBE => config('social.youtube.redirect_uri'),
         };
 
         return response()->json([
             'auth_url' => $authUrl,
             'state' => $state,
             'configured' => $isConfigured,
-            'message' => $isConfigured ? null : "Para autenticación OAuth con {$platform} se requiere una aplicación registrada en la consola de desarrolladores. Puedes conectar tu canal directamente usando tu @handle.",
+            'redirect_uri' => $redirectUri,
+            'platform' => $platform,
+            'message' => $isConfigured ? null : "Para autenticación OAuth con {$platform} se requiere registrar las credenciales de tu aplicación (Client ID y Client Secret).",
         ], 200);
     }
 
@@ -158,18 +178,40 @@ class OAuthController extends Controller
             return response()->json(['message' => "Unsupported platform: {$platform}"], 400);
         }
 
+        if ($request->has('error')) {
+            $errorMessage = (string) ($request->query('error_description') ?: $request->query('error'));
+            if (! $request->wantsJson()) {
+                $frontendUrl = env('FRONTEND_URL', 'https://reelscreator-beta.vercel.app');
+
+                return redirect("{$frontendUrl}/social-accounts?error=".urlencode($errorMessage));
+            }
+
+            return response()->json(['message' => 'OAuth provider error', 'error' => $errorMessage], 400);
+        }
+
         $code = $request->query('code');
         if (! $code) {
             return response()->json(['message' => 'Missing authorization code'], 400);
         }
 
+        $state = (string) $request->query('state');
+        $creds = $state ? Cache::get("oauth_creds_{$platform}_{$state}", []) : [];
+        $customClientId = $creds['client_id'] ?? null;
+        $customClientSecret = $creds['client_secret'] ?? null;
+
         $tokenData = match ($platform) {
-            SocialAccount::PLATFORM_TIKTOK => $this->tikTokOAuth->exchangeCode($code),
-            SocialAccount::PLATFORM_INSTAGRAM => $this->instagramOAuth->exchangeCode($code),
-            SocialAccount::PLATFORM_YOUTUBE => $this->youTubeOAuth->exchangeCode($code),
+            SocialAccount::PLATFORM_TIKTOK => $this->tikTokOAuth->exchangeCode($code, null, $customClientId, $customClientSecret),
+            SocialAccount::PLATFORM_INSTAGRAM => $this->instagramOAuth->exchangeCode($code, $customClientId, $customClientSecret),
+            SocialAccount::PLATFORM_YOUTUBE => $this->youTubeOAuth->exchangeCode($code, $customClientId, $customClientSecret),
         };
 
         $account = $this->accountService->saveOAuthAccount($platform, $tokenData, $request->user()?->id);
+
+        if (! $request->wantsJson()) {
+            $frontendUrl = env('FRONTEND_URL', 'https://reelscreator-beta.vercel.app');
+
+            return redirect("{$frontendUrl}/social-accounts?connected={$platform}");
+        }
 
         return response()->json([
             'id' => $account->id,

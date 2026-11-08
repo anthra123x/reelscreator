@@ -17,6 +17,7 @@ export interface SimpleConnectRequest {
   mode?: string;
   username?: string;
   access_token?: string;
+  refresh_token?: string;
 }
 
 export interface SimpleConnectResponse {
@@ -41,6 +42,9 @@ export interface MockConnectResponse {
 export interface ConnectPlatformResponse {
   auth_url: string;
   state: string;
+  configured?: boolean;
+  message?: string;
+  redirect_uri?: string;
 }
 
 export interface SocialAccountsResponse {

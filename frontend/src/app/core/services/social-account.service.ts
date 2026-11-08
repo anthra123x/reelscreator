@@ -86,8 +86,14 @@ export class SocialAccountService {
    * Initiate OAuth handshake flow for a platform (TikTok, Instagram, YouTube).
    * POST /api/social-accounts/connect/{platform}
    */
-  connectPlatform(platform: SocialPlatform): Observable<ConnectPlatformResponse> {
-    return this.api.post<ConnectPlatformResponse>(`social-accounts/connect/${platform}`);
+  connectPlatform(
+    platform: SocialPlatform,
+    credentials?: { client_id?: string; client_secret?: string }
+  ): Observable<ConnectPlatformResponse> {
+    return this.api.post<ConnectPlatformResponse>(
+      `social-accounts/connect/${platform}`,
+      credentials || {}
+    );
   }
 
   /**

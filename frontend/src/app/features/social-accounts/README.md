@@ -45,6 +45,9 @@ El módulo expone el componente standalone `SocialAccountsComponent`:
 - Etiquetas de diagnóstico en tarjetas: La inclusión explícita de `is_active` y `status` permite identificar de inmediato si una cuenta vinculada tiene un token vencido o deshabilitado.
 
 ## 7. Estado y últimos cambios
+- Implementacion de modal interactivo de autorizacion OAuth oficial (`openOAuthModal`) con soporte para ingreso de credenciales de aplicacion (Client ID / Secret) o vinculacion por Token de Acceso Directo (Bearer).
+- Despliegue de URI de redireccion autorizada en tiempo real (`https://reelscreator-api.vercel.app/api/social-accounts/callback/{platform}`) con boton de copiado al portapapeles.
+- Deteccion de retornos de autorizacion OAuth via query params (`?connected=` o `?error=`) con feedback en UI y limpieza de URL.
 - Eliminación del banner y panel "MODO MOCK / PRUEBAS LOCALES".
 - Incorporación de conexión directa mediante input de handle `@usuario` por plataforma.
 - Soporte para avisos guiados ante intentos de OAuth sin credenciales registradas.

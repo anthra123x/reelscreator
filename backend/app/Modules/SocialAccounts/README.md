@@ -132,6 +132,8 @@ Este modulo provee a la capa de publicacion (`Publishing`) las credenciales auto
 - **Compatibilidad con esquemas PostgreSQL**: La tabla `social_accounts` cuenta con indice unico `uq_user_platform_acc` (`user_id, platform, platform_user_id`). Al reutilizar o actualizar identificadores de plataforma de forma controlada, nunca se producen colisiones de clave unica.
 
 ## 7. Estado y últimos cambios
+- Implementacion de recepcion dinamica de credenciales OAuth (`client_id`, `client_secret`) en `OAuthController::connect` con persistencia temporal en cache para el intercambio seguro de codigos en `callback`.
+- Configuracion automatica de `redirect_uri` apuntando a `reelscreator-api.vercel.app` para YouTube Shorts, Instagram Graph API y TikTok API v2.
 - Verificacion de credenciales de desarrollador en `OAuthController::connect` para prevenir redirecciones invalidas a TikTok u otras plataformas cuando falten claves de API registradas en consola.
 - Integracion de vinculacion directa por handle `@usuario` (`mode: direct`) con `is_mock = false` y vigencia de 90 dias.
 - Eliminacion de interfaces de prueba sintetica o paneles de simulacion en frontend, consolidando la experiencia en conexion directa de canales de produccion.

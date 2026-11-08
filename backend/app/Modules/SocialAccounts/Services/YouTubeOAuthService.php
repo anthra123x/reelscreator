@@ -20,14 +20,14 @@ class YouTubeOAuthService
     {
         $this->clientId = (string) config('social.youtube.client_id', 'mock_yt_client_id');
         $this->clientSecret = (string) config('social.youtube.client_secret', 'mock_yt_client_secret');
-        $this->redirectUri = (string) config('social.youtube.redirect_uri', 'http://localhost:8000/api/social-accounts/callback/youtube');
+        $this->redirectUri = (string) config('social.youtube.redirect_uri', 'https://reelscreator-api.vercel.app/api/social-accounts/callback/youtube');
         $this->apiBase = (string) config('social.youtube.api_base', 'https://www.googleapis.com/youtube/v3');
     }
 
-    public function getAuthorizationUrl(string $state): string
+    public function getAuthorizationUrl(string $state, ?string $clientId = null): string
     {
         $params = http_build_query([
-            'client_id' => $this->clientId,
+            'client_id' => $clientId ?: $this->clientId,
             'redirect_uri' => $this->redirectUri,
             'response_type' => 'code',
             'scope' => 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/userinfo.profile',
@@ -39,7 +39,7 @@ class YouTubeOAuthService
         return "https://accounts.google.com/o/oauth2/v2/auth?{$params}";
     }
 
-    public function exchangeCode(string $code): array
+    public function exchangeCode(string $code, ?string $clientId = null, ?string $clientSecret = null): array
     {
         if (config('social.mock_mode')) {
             return [
@@ -51,9 +51,12 @@ class YouTubeOAuthService
             ];
         }
 
+        $effectiveClientId = $clientId ?: $this->clientId;
+        $effectiveClientSecret = $clientSecret ?: $this->clientSecret;
+
         $response = Http::asForm()->post('https://oauth2.googleapis.com/token', [
-            'client_id' => $this->clientId,
-            'client_secret' => $this->clientSecret,
+            'client_id' => $effectiveClientId,
+            'client_secret' => $effectiveClientSecret,
             'code' => $code,
             'grant_type' => 'authorization_code',
             'redirect_uri' => $this->redirectUri,

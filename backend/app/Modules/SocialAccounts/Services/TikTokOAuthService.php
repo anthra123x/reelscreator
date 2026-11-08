@@ -20,16 +20,16 @@ class TikTokOAuthService
     {
         $this->clientKey = (string) config('social.tiktok.client_key', 'mock_tiktok_client_key');
         $this->clientSecret = (string) config('social.tiktok.client_secret', 'mock_tiktok_client_secret');
-        $this->redirectUri = (string) config('social.tiktok.redirect_uri', 'http://localhost:8000/api/social-accounts/callback/tiktok');
+        $this->redirectUri = (string) config('social.tiktok.redirect_uri', 'https://reelscreator-api.vercel.app/api/social-accounts/callback/tiktok');
         $this->apiBase = (string) config('social.tiktok.api_base', 'https://open.tiktokapis.com/v2');
     }
 
-    public function getAuthorizationUrl(string $state, ?string $codeVerifier = null): string
+    public function getAuthorizationUrl(string $state, ?string $codeVerifier = null, ?string $clientKey = null): string
     {
         $codeChallenge = $codeVerifier ? hash('sha256', $codeVerifier) : 'mock_challenge';
 
         $params = http_build_query([
-            'client_key' => $this->clientKey,
+            'client_key' => $clientKey ?: $this->clientKey,
             'scope' => 'user.info.basic,video.upload,video.publish',
             'response_type' => 'code',
             'redirect_uri' => $this->redirectUri,
@@ -41,7 +41,7 @@ class TikTokOAuthService
         return "https://www.tiktok.com/v2/auth/authorize/?{$params}";
     }
 
-    public function exchangeCode(string $code, ?string $codeVerifier = null): array
+    public function exchangeCode(string $code, ?string $codeVerifier = null, ?string $clientKey = null, ?string $clientSecret = null): array
     {
         if (config('social.mock_mode')) {
             return [
@@ -53,9 +53,12 @@ class TikTokOAuthService
             ];
         }
 
+        $effectiveClientKey = $clientKey ?: $this->clientKey;
+        $effectiveClientSecret = $clientSecret ?: $this->clientSecret;
+
         $response = Http::asForm()->post("{$this->apiBase}/oauth/token/", [
-            'client_key' => $this->clientKey,
-            'client_secret' => $this->clientSecret,
+            'client_key' => $effectiveClientKey,
+            'client_secret' => $effectiveClientSecret,
             'code' => $code,
             'grant_type' => 'authorization_code',
             'redirect_uri' => $this->redirectUri,

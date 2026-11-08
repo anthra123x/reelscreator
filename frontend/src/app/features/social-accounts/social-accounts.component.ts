@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
 import { SocialAccountService } from '../../core/services/social-account.service';
 import { SocialPlatform } from '../../core/models/common.model';
 import { SocialAccount } from '../../core/models/social-account.model';
@@ -157,7 +158,7 @@ interface PlatformMeta {
                   <button
                     type="button"
                     class="btn-link-oauth"
-                    (click)="connectOAuth(p.key)"
+                    (click)="openOAuthModal(p.key)"
                   >
                     O conectar mediante OAuth oficial →
                   </button>
@@ -168,6 +169,173 @@ interface PlatformMeta {
                 </div>
               </div>
             </ng-template>
+          </div>
+        </div>
+      </div>
+
+      <!-- OAuth Official Configuration Modal -->
+      <div *ngIf="isOAuthModalOpen() && selectedPlatform() as sel" class="modal-backdrop" (click)="closeOAuthModal()">
+        <div class="modal-dialog" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <div class="modal-title-group">
+              <span class="modal-platform-icon">
+                <svg *ngIf="sel.key === 'tiktok'" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64c.298-.002.595.042.88.13V9.4a6.33 6.33 0 0 0-1-.08A6.34 6.34 0 0 0 3 15.66a6.34 6.34 0 0 0 10.82 4.47 6.27 6.27 0 0 0 1.94-4.47V8.5a8.28 8.28 0 0 0 4.83 1.55v-3.36z"/>
+                </svg>
+                <svg *ngIf="sel.key === 'instagram'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                  <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
+                  <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
+                </svg>
+                <svg *ngIf="sel.key === 'youtube'" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                </svg>
+              </span>
+              <div>
+                <h3 class="modal-title">Conectar {{ sel.name }} (OAuth Oficial)</h3>
+                <p class="modal-subtitle">Configura la autenticación oficial para publicación automatizada.</p>
+              </div>
+            </div>
+            <button type="button" class="btn-modal-close" (click)="closeOAuthModal()" aria-label="Cerrar modal">&times;</button>
+          </div>
+
+          <div class="modal-body">
+            <!-- Redirect URI Box -->
+            <div class="redirect-uri-box">
+              <div class="redirect-uri-header">
+                <span class="redirect-uri-label">URI de Redirección Autorizada (OAuth Callback):</span>
+                <button type="button" class="btn-copy-uri" (click)="copyRedirectUri(sel.key)">
+                  {{ copyFeedback() ? 'Copiado' : 'Copiar URI' }}
+                </button>
+              </div>
+              <div class="redirect-uri-val">{{ getRedirectUri(sel.key) }}</div>
+              <p class="redirect-uri-desc">
+                Copia esta URL en tu consola de desarrollador ({{ sel.key === 'youtube' ? 'Google Cloud Console > Credenciales > URIs de redireccionamiento autorizados' : sel.key === 'instagram' ? 'Meta for Developers > Instagram Graph API > Configuración' : 'TikTok for Developers > App Details > Redirect URI' }}).
+              </p>
+            </div>
+
+            <!-- Tabs -->
+            <div class="modal-tabs">
+              <button
+                type="button"
+                class="modal-tab-btn"
+                [class.active]="oauthTab() === 'credentials'"
+                (click)="oauthTab.set('credentials')"
+              >
+                Credenciales OAuth (Client ID)
+              </button>
+              <button
+                type="button"
+                class="modal-tab-btn"
+                [class.active]="oauthTab() === 'token'"
+                (click)="oauthTab.set('token')"
+              >
+                Token de Acceso Directo (Bearer)
+              </button>
+            </div>
+
+            <!-- Error Banner in Modal -->
+            <div *ngIf="oauthModalError()" class="modal-alert-error">
+              <span>{{ oauthModalError() }}</span>
+            </div>
+
+            <!-- Tab 1: App Credentials -->
+            <div *ngIf="oauthTab() === 'credentials'" class="tab-pane">
+              <div class="form-group">
+                <label class="form-label" for="oauth-client-id">
+                  {{ sel.key === 'tiktok' ? 'Client Key' : sel.key === 'instagram' ? 'App ID / Client ID' : 'Client ID' }}:
+                </label>
+                <input
+                  id="oauth-client-id"
+                  type="text"
+                  class="form-control"
+                  [placeholder]="sel.key === 'tiktok' ? 'ej. awxxxxxx' : sel.key === 'instagram' ? 'ej. 123456789012345' : 'ej. xxxxxx.apps.googleusercontent.com'"
+                  [(ngModel)]="oauthClientId"
+                  autocomplete="off"
+                />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="oauth-client-secret">
+                  {{ sel.key === 'tiktok' ? 'Client Secret' : sel.key === 'instagram' ? 'App Secret' : 'Client Secret' }}:
+                </label>
+                <input
+                  id="oauth-client-secret"
+                  type="password"
+                  class="form-control"
+                  placeholder="ej. GOCSPX-xxxxxx o secret key"
+                  [(ngModel)]="oauthClientSecret"
+                  autocomplete="off"
+                />
+              </div>
+
+              <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" (click)="closeOAuthModal()">
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  (click)="submitOAuthCredentials()"
+                  [disabled]="isSubmittingOAuth()"
+                >
+                  {{ isSubmittingOAuth() ? 'Iniciando Autorización...' : 'Iniciar Autorización en ' + sel.name + ' →' }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Tab 2: Direct Access Token -->
+            <div *ngIf="oauthTab() === 'token'" class="tab-pane">
+              <div class="form-group">
+                <label class="form-label" for="direct-username">Nombre de Usuario / Handle:</label>
+                <input
+                  id="direct-username"
+                  type="text"
+                  class="form-control"
+                  placeholder="ej. mi_canal o reels_brand"
+                  [(ngModel)]="directUsername"
+                />
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="direct-token">Access Token (Bearer):</label>
+                <input
+                  id="direct-token"
+                  type="password"
+                  class="form-control"
+                  placeholder="ej. ya29.a0... o EAA..."
+                  [(ngModel)]="directToken"
+                  autocomplete="off"
+                />
+                <span class="field-hint">Token emitido desde Google OAuth Playground, Meta Graph Explorer o TikTok Developer.</span>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" for="direct-refresh-token">Refresh Token (Opcional):</label>
+                <input
+                  id="direct-refresh-token"
+                  type="password"
+                  class="form-control"
+                  placeholder="ej. 1//0gxxxxxx (opcional para renovación automática)"
+                  [(ngModel)]="directRefreshToken"
+                  autocomplete="off"
+                />
+              </div>
+
+              <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" (click)="closeOAuthModal()">
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  (click)="submitDirectToken()"
+                  [disabled]="isSubmittingOAuth()"
+                >
+                  {{ isSubmittingOAuth() ? 'Vinculando...' : 'Vincular con Token Oficial' }}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -202,13 +370,6 @@ interface PlatformMeta {
 
     .btn-quick-connect-all:hover {
       background: linear-gradient(135deg, #4f46e5, #7c3aed);
-    }
-
-    .btn-quick-mock {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      margin-right: 8px;
     }
 
     .status-connected {
@@ -247,81 +408,6 @@ interface PlatformMeta {
       color: var(--text-muted, #94a3b8);
     }
 
-    .mock-panel {
-      background-color: var(--bg-surface, #121214);
-      border: 1px solid var(--border-subtle, #27272a);
-      border-radius: var(--radius-md, 10px);
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
-
-    .mock-header {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .mock-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      font-weight: 700;
-      color: #ffffff;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .mock-badge svg {
-      width: 16px;
-      height: 16px;
-      flex-shrink: 0;
-    }
-
-    .mock-desc {
-      font-size: 12px;
-      color: var(--text-muted, #a1a1aa);
-    }
-
-    .mock-form {
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-    }
-
-    @media (min-width: 640px) {
-      .mock-form {
-        flex-direction: row;
-        align-items: flex-end;
-      }
-    }
-
-    .mock-inputs {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      flex: 1;
-    }
-
-    @media (min-width: 480px) {
-      .mock-inputs {
-        flex-direction: row;
-      }
-    }
-
-    .flex-1 {
-      flex: 1;
-      margin-bottom: 0;
-    }
-
-    .btn-mock-submit {
-      padding: 10px 18px;
-      font-size: 13px;
-      white-space: nowrap;
-      height: 42px;
-    }
-
     .alert-success {
       background-color: rgba(16, 185, 129, 0.15);
       border: 1px solid rgba(16, 185, 129, 0.3);
@@ -329,6 +415,9 @@ interface PlatformMeta {
       padding: 8px 12px;
       border-radius: 6px;
       font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
     .platforms-grid {
@@ -460,12 +549,6 @@ interface PlatformMeta {
       background-color: var(--bg-surface-elevated, #18181b);
     }
 
-    .mock-tag {
-      background-color: #27272a;
-      color: #ffffff;
-      border: 1px solid #3f3f46;
-    }
-
     .disconnected-details {
       display: flex;
       flex-direction: column;
@@ -562,10 +645,272 @@ interface PlatformMeta {
       padding: 6px 12px;
       font-size: 12px;
     }
+
+    /* Modal Styles */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .modal-dialog {
+      background: #0f0f11;
+      border: 1px solid #27272a;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 540px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes modalFadeIn {
+      from {
+        opacity: 0;
+        transform: scale(0.96) translateY(8px);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid #27272a;
+    }
+
+    .modal-title-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .modal-platform-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      background: #18181b;
+      border: 1px solid #27272a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+    }
+
+    .modal-platform-icon svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .modal-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #ffffff;
+      margin: 0;
+    }
+
+    .modal-subtitle {
+      font-size: 12px;
+      color: #a1a1aa;
+      margin: 2px 0 0 0;
+    }
+
+    .btn-modal-close {
+      background: transparent;
+      border: none;
+      color: #a1a1aa;
+      font-size: 24px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 4px;
+      transition: color 0.15s ease;
+    }
+
+    .btn-modal-close:hover {
+      color: #ffffff;
+    }
+
+    .modal-body {
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .redirect-uri-box {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .redirect-uri-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .redirect-uri-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #a1a1aa;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .btn-copy-uri {
+      background: #27272a;
+      border: 1px solid #3f3f46;
+      border-radius: 4px;
+      color: #e4e4e7;
+      font-size: 11px;
+      padding: 3px 8px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .btn-copy-uri:hover {
+      background: #3f3f46;
+      color: #ffffff;
+    }
+
+    .redirect-uri-val {
+      font-family: monospace;
+      font-size: 11px;
+      color: #60a5fa;
+      background: #09090b;
+      padding: 6px 8px;
+      border-radius: 4px;
+      border: 1px solid #27272a;
+      word-break: break-all;
+    }
+
+    .redirect-uri-desc {
+      font-size: 11px;
+      color: #71717a;
+      margin: 0;
+      line-height: 1.3;
+    }
+
+    .modal-tabs {
+      display: flex;
+      gap: 8px;
+      border-bottom: 1px solid #27272a;
+      padding-bottom: 8px;
+    }
+
+    .modal-tab-btn {
+      background: transparent;
+      border: none;
+      color: #a1a1aa;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .modal-tab-btn.active {
+      background: #27272a;
+      color: #ffffff;
+      border: 1px solid #3f3f46;
+    }
+
+    .modal-tab-btn:hover:not(.active) {
+      color: #e4e4e7;
+    }
+
+    .modal-alert-error {
+      background: rgba(239, 68, 68, 0.15);
+      border: 1px solid rgba(239, 68, 68, 0.3);
+      color: #f87171;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+
+    .tab-pane {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .form-label {
+      font-size: 11px;
+      font-weight: 500;
+      color: #d4d4d8;
+    }
+
+    .form-control {
+      background: #18181b;
+      border: 1px solid #27272a;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 12px;
+      color: #ffffff;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+
+    .form-control:focus {
+      border-color: #ffffff;
+    }
+
+    .field-hint {
+      font-size: 10px;
+      color: #71717a;
+    }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .btn-secondary {
+      background: #18181b;
+      border: 1px solid #27272a;
+      color: #d4d4d8;
+      padding: 8px 14px;
+      font-size: 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .btn-secondary:hover {
+      background: #27272a;
+      color: #ffffff;
+    }
   `],
 })
 export class SocialAccountsComponent implements OnInit {
   private readonly socialService = inject(SocialAccountService);
+  private readonly route = inject(ActivatedRoute, { optional: true });
+  private readonly router = inject(Router, { optional: true });
 
   readonly accounts = signal<SocialAccount[]>([]);
   readonly isLoading = signal<boolean>(true);
@@ -574,6 +919,20 @@ export class SocialAccountsComponent implements OnInit {
   readonly connectingPlatform = signal<string | null>(null);
   readonly isDisconnecting = signal<boolean>(false);
   readonly mockSuccessMessage = signal<string | null>(null);
+
+  // Modal State
+  readonly isOAuthModalOpen = signal<boolean>(false);
+  readonly selectedPlatform = signal<PlatformMeta | null>(null);
+  readonly oauthTab = signal<'credentials' | 'token'>('credentials');
+  readonly isSubmittingOAuth = signal<boolean>(false);
+  readonly oauthModalError = signal<string | null>(null);
+  readonly copyFeedback = signal<boolean>(false);
+
+  oauthClientId = '';
+  oauthClientSecret = '';
+  directUsername = '';
+  directToken = '';
+  directRefreshToken = '';
 
   readonly channelHandles: Record<string, string> = {
     tiktok: '',
@@ -616,6 +975,25 @@ export class SocialAccountsComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadAccounts();
+
+    if (this.route) {
+      const connected = this.route.snapshot.queryParamMap.get('connected');
+      const error = this.route.snapshot.queryParamMap.get('error');
+
+      if (connected) {
+        this.mockSuccessMessage.set(
+          `Canal de ${connected.toUpperCase()} conectado exitosamente vía OAuth oficial.`
+        );
+        setTimeout(() => this.mockSuccessMessage.set(null), 6000);
+        this.router?.navigate([], { replaceUrl: true });
+      } else if (error) {
+        this.mockSuccessMessage.set(
+          `Error en la autorización OAuth: ${decodeURIComponent(error)}`
+        );
+        setTimeout(() => this.mockSuccessMessage.set(null), 7000);
+        this.router?.navigate([], { replaceUrl: true });
+      }
+    }
   }
 
   loadAccounts(): void {
@@ -633,6 +1011,121 @@ export class SocialAccountsComponent implements OnInit {
 
   getAccount(platform: SocialPlatform): SocialAccount | undefined {
     return this.accounts().find((a) => a.platform === platform);
+  }
+
+  openOAuthModal(platformKey: SocialPlatform): void {
+    const p = this.platforms.find((item) => item.key === platformKey) || null;
+    this.selectedPlatform.set(p);
+    this.oauthClientId = '';
+    this.oauthClientSecret = '';
+    this.directToken = '';
+    this.directRefreshToken = '';
+    this.directUsername = (this.channelHandles[platformKey] || '').replace(/^@/, '');
+    this.oauthModalError.set(null);
+    this.oauthTab.set('credentials');
+    this.isOAuthModalOpen.set(true);
+  }
+
+  closeOAuthModal(): void {
+    this.isOAuthModalOpen.set(false);
+    this.selectedPlatform.set(null);
+    this.oauthModalError.set(null);
+  }
+
+  getRedirectUri(platform: SocialPlatform): string {
+    return `https://reelscreator-api.vercel.app/api/social-accounts/callback/${platform}`;
+  }
+
+  copyRedirectUri(platform: SocialPlatform): void {
+    const uri = this.getRedirectUri(platform);
+    navigator.clipboard?.writeText(uri).then(() => {
+      this.copyFeedback.set(true);
+      setTimeout(() => this.copyFeedback.set(false), 2000);
+    }).catch(() => {
+      // Fallback
+    });
+  }
+
+  submitOAuthCredentials(): void {
+    const p = this.selectedPlatform();
+    if (!p) return;
+
+    const clientId = this.oauthClientId.trim();
+    const clientSecret = this.oauthClientSecret.trim();
+
+    if (!clientId) {
+      this.oauthModalError.set(
+        `Por favor ingresa el ${p.key === 'tiktok' ? 'Client Key' : 'Client ID'} de tu aplicación.`
+      );
+      return;
+    }
+
+    this.isSubmittingOAuth.set(true);
+    this.oauthModalError.set(null);
+
+    this.socialService
+      .connectPlatform(p.key, {
+        client_id: clientId,
+        client_secret: clientSecret || undefined,
+      })
+      .subscribe({
+        next: (res) => {
+          this.isSubmittingOAuth.set(false);
+          if (res.auth_url) {
+            window.location.href = res.auth_url;
+          } else {
+            this.oauthModalError.set('No se recibió la URL de autenticación del servidor.');
+          }
+        },
+        error: (err) => {
+          this.isSubmittingOAuth.set(false);
+          this.oauthModalError.set(
+            err?.error?.message || err?.message || 'Error al iniciar flujo OAuth.'
+          );
+        },
+      });
+  }
+
+  submitDirectToken(): void {
+    const p = this.selectedPlatform();
+    if (!p) return;
+
+    const token = this.directToken.trim();
+    const username = (this.directUsername.trim() || `${p.key}_creator`).replace(/^@/, '');
+
+    if (!token) {
+      this.oauthModalError.set('Por favor ingresa el Access Token emitido por la plataforma.');
+      return;
+    }
+
+    this.isSubmittingOAuth.set(true);
+    this.oauthModalError.set(null);
+
+    this.socialService
+      .connectSimple({
+        platform: p.key,
+        mode: 'direct',
+        username,
+        access_token: token,
+        refresh_token: this.directRefreshToken.trim() || undefined,
+      })
+      .subscribe({
+        next: () => {
+          this.isSubmittingOAuth.set(false);
+          this.mockSuccessMessage.set(
+            `Canal de ${p.name} (@${username}) vinculado exitosamente con token oficial.`
+          );
+          this.closeOAuthModal();
+          this.loadAccounts();
+          setTimeout(() => this.mockSuccessMessage.set(null), 5000);
+        },
+        error: (err) => {
+          this.isSubmittingOAuth.set(false);
+          this.oauthModalError.set(
+            err?.error?.message || err?.message || 'Error al vincular con token oficial.'
+          );
+        },
+      });
   }
 
   onQuickConnectAll(): void {
@@ -704,7 +1197,8 @@ export class SocialAccountsComponent implements OnInit {
         },
         error: (err) => {
           this.connectingPlatform.set(null);
-          this.oauthNotices[platform] = err?.error?.message || err?.message || 'Error al conectar canal.';
+          this.oauthNotices[platform] =
+            err?.error?.message || err?.message || 'Error al conectar canal.';
         },
       });
   }
@@ -726,7 +1220,6 @@ export class SocialAccountsComponent implements OnInit {
           this.mockSuccessMessage.set(
             `Canal ${created.platform} vinculado para @${created.platform_username}`
           );
-          // Reload to sync account list
           this.loadAccounts();
           setTimeout(() => this.mockSuccessMessage.set(null), 4000);
         },
@@ -737,28 +1230,7 @@ export class SocialAccountsComponent implements OnInit {
   }
 
   connectOAuth(platform: SocialPlatform): void {
-    this.oauthNotices[platform] = '';
-    this.socialService.connectPlatform(platform).subscribe({
-      next: (res: any) => {
-        if (res.configured === false) {
-          this.oauthNotices[platform] =
-            res.message ||
-            'Para autenticación OAuth con ' +
-              platform.toUpperCase() +
-              ' se requiere una aplicación registrada en la consola de desarrolladores. Puedes conectar tu canal directamente usando tu @handle.';
-          return;
-        }
-        if (res.auth_url) {
-          window.location.href = res.auth_url;
-        }
-      },
-      error: (err) => {
-        const msg =
-          err?.error?.message ||
-          'Para usar OAuth oficial se requiere registrar credenciales de la app en la consola de desarrollador. Puedes conectar tu canal directamente escribiendo tu @handle en el campo superior.';
-        this.oauthNotices[platform] = msg;
-      },
-    });
+    this.openOAuthModal(platform);
   }
 
   disconnect(acc: SocialAccount): void {

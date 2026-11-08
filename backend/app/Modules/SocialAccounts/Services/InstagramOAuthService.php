@@ -20,14 +20,14 @@ class InstagramOAuthService
     {
         $this->clientId = (string) config('social.instagram.client_id', 'mock_ig_client_id');
         $this->clientSecret = (string) config('social.instagram.client_secret', 'mock_ig_client_secret');
-        $this->redirectUri = (string) config('social.instagram.redirect_uri', 'http://localhost:8000/api/social-accounts/callback/instagram');
+        $this->redirectUri = (string) config('social.instagram.redirect_uri', 'https://reelscreator-api.vercel.app/api/social-accounts/callback/instagram');
         $this->graphBase = (string) config('social.instagram.graph_base', 'https://graph.facebook.com/v21.0');
     }
 
-    public function getAuthorizationUrl(string $state): string
+    public function getAuthorizationUrl(string $state, ?string $clientId = null): string
     {
         $params = http_build_query([
-            'client_id' => $this->clientId,
+            'client_id' => $clientId ?: $this->clientId,
             'redirect_uri' => $this->redirectUri,
             'scope' => 'instagram_basic,instagram_content_publish,pages_show_list',
             'response_type' => 'code',
@@ -37,7 +37,7 @@ class InstagramOAuthService
         return "https://www.facebook.com/v21.0/dialog/oauth?{$params}";
     }
 
-    public function exchangeCode(string $code): array
+    public function exchangeCode(string $code, ?string $clientId = null, ?string $clientSecret = null): array
     {
         if (config('social.mock_mode')) {
             return [
@@ -49,9 +49,12 @@ class InstagramOAuthService
             ];
         }
 
+        $effectiveClientId = $clientId ?: $this->clientId;
+        $effectiveClientSecret = $clientSecret ?: $this->clientSecret;
+
         $response = Http::get("{$this->graphBase}/oauth/access_token", [
-            'client_id' => $this->clientId,
-            'client_secret' => $this->clientSecret,
+            'client_id' => $effectiveClientId,
+            'client_secret' => $effectiveClientSecret,
             'redirect_uri' => $this->redirectUri,
             'code' => $code,
         ]);
